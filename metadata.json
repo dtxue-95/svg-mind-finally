@@ -1,0 +1,6 @@
+{
+  "name": "React SVG Mind Map",
+  "description": "An interactive mind mapping application built with React, TypeScript, and SVG for creating and organizing ideas visually. Users can add, edit, delete, and rearrange nodes in a hierarchical structure with smooth animations and intuitive controls.",
+  "requestFramePermissions": [],
+  "prompt": ""
+}

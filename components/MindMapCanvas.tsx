@@ -1,5 +1,3 @@
-
-
 import React, { useCallback, useRef, useEffect, useReducer, useMemo, useState } from 'react';
 import type { MindMapData, CommandId, MindMapNodeData, NodeType, NodePriority, DataChangeCallback, CanvasTransform, ReviewStatusCode, ScoreInfo } from '../types';
 import { MindMapNode } from './MindMapNode';
@@ -66,28 +64,19 @@ const ReadOnlyToggle: React.FC<ReadOnlyToggleProps> = ({ isReadOnly, onToggleRea
     );
 };
 
-interface ReviewContextMenuState {
-    isVisible: boolean;
-    nodeUuid: string | null;
-    x: number;
-    y: number;
-    hasUseCases: boolean;
-    nodeType: NodeType | null;
+type PopupType = 'review' | 'remark' | 'score';
+
+interface PopupState {
+  type: PopupType | null;
+  nodeUuid: string | null;
+  x: number;
+  y: number;
+  context?: {
+      hasUseCases?: boolean;
+      nodeType?: NodeType | null;
+  };
 }
 
-interface RemarkModalState {
-    isVisible: boolean;
-    nodeUuid: string | null;
-    x: number;
-    y: number;
-}
-
-interface ScoreModalState {
-    isVisible: boolean;
-    nodeUuid: string | null;
-    x: number;
-    y: number;
-}
 
 interface MindMapCanvasProps {
     mindMapData: MindMapData;
@@ -194,9 +183,7 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
 
     const [isShortcutsPanelVisible, setIsShortcutsPanelVisible] = useState(false);
     const [shortcutsPanelPosition, setShortcutsPanelPosition] = useState<{top: number; right: number}>({ top: 0, right: 0 });
-    const [reviewContextMenu, setReviewContextMenu] = useState<ReviewContextMenuState>({ isVisible: false, nodeUuid: null, x: 0, y: 0, hasUseCases: false, nodeType: null });
-    const [remarkModal, setRemarkModal] = useState<RemarkModalState>({ isVisible: false, nodeUuid: null, x: 0, y: 0 });
-    const [scoreModal, setScoreModal] = useState<ScoreModalState>({ isVisible: false, nodeUuid: null, x: 0, y: 0 });
+    const [activePopup, setActivePopup] = useState<PopupState>({ type: null, nodeUuid: null, x: 0, y: 0 });
 
 
     // Refs for smooth dragging with requestAnimationFrame
@@ -670,6 +657,10 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
         setIsShortcutsPanelVisible(false);
     }, []);
 
+    const handleClosePopup = useCallback(() => {
+        setActivePopup({ type: null, nodeUuid: null, x: 0, y: 0 });
+    }, []);
+
     const handleOpenReviewContextMenu = useCallback((nodeUuid: string, event: React.MouseEvent) => {
         const node = mindMapData.nodes[nodeUuid];
         if (!node || !node.nodeType) return;
@@ -681,87 +672,78 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
             isReadyForReview = node.nodeType === 'USE_CASE' ? true : hasUseCaseDescendant(mindMapData, nodeUuid);
         }
 
-        setReviewContextMenu({
-            isVisible: true,
+        setActivePopup({
+            type: 'review',
             nodeUuid,
             x: event.clientX,
             y: event.clientY,
-            hasUseCases: isReadyForReview,
-            nodeType: node.nodeType,
+            context: {
+                hasUseCases: isReadyForReview,
+                nodeType: node.nodeType,
+            },
         });
     }, [mindMapData]);
 
-    const handleCloseReviewContextMenu = useCallback(() => {
-        setReviewContextMenu(prevState => ({ ...prevState, isVisible: false, nodeUuid: null }));
+    const handleOpenRemarkModal = useCallback((nodeUuid: string, event: React.MouseEvent) => {
+        setActivePopup({
+            type: 'remark',
+            nodeUuid,
+            x: event.clientX,
+            y: event.clientY,
+        });
+    }, []);
+
+    const handleOpenScoreModal = useCallback((nodeUuid: string, event: React.MouseEvent) => {
+        setActivePopup({
+            type: 'score',
+            nodeUuid,
+            x: event.clientX,
+            y: event.clientY,
+        });
     }, []);
 
     const handleConfirmReviewStatus = useCallback((newStatus: ReviewStatusCode) => {
-        if (reviewContextMenu.nodeUuid) {
-            onConfirmReviewStatus(reviewContextMenu.nodeUuid, newStatus);
+        if (activePopup.nodeUuid) {
+            onConfirmReviewStatus(activePopup.nodeUuid, newStatus);
         }
-        handleCloseReviewContextMenu();
-    }, [reviewContextMenu.nodeUuid, onConfirmReviewStatus, handleCloseReviewContextMenu]);
-
-    const handleOpenRemarkModal = useCallback((nodeUuid: string, event: React.MouseEvent) => {
-        setRemarkModal({
-            isVisible: true,
-            nodeUuid,
-            x: event.clientX,
-            y: event.clientY,
-        });
-    }, []);
-
-    const handleCloseRemarkModal = useCallback(() => {
-        setRemarkModal(prevState => ({ ...prevState, isVisible: false, nodeUuid: null }));
-    }, []);
+        handleClosePopup();
+    }, [activePopup.nodeUuid, onConfirmReviewStatus, handleClosePopup]);
 
     const handleConfirmRemark = useCallback((content: string) => {
-        if (remarkModal.nodeUuid) {
-            onConfirmRemark(remarkModal.nodeUuid, content);
+        if (activePopup.nodeUuid) {
+            onConfirmRemark(activePopup.nodeUuid, content);
         }
-    }, [remarkModal.nodeUuid, onConfirmRemark]);
-
-    const handleOpenScoreModal = useCallback((nodeUuid: string, event: React.MouseEvent) => {
-        setScoreModal({
-            isVisible: true,
-            nodeUuid,
-            x: event.clientX,
-            y: event.clientY,
-        });
-    }, []);
-
-    const handleCloseScoreModal = useCallback(() => {
-        setScoreModal(prevState => ({ ...prevState, isVisible: false, nodeUuid: null }));
-    }, []);
+        handleClosePopup();
+    }, [activePopup.nodeUuid, onConfirmRemark, handleClosePopup]);
 
     const handleConfirmScore = useCallback((scoreInfo: ScoreInfo) => {
-        if (scoreModal.nodeUuid) {
-            onConfirmScore(scoreModal.nodeUuid, scoreInfo);
+        if (activePopup.nodeUuid) {
+            onConfirmScore(activePopup.nodeUuid, scoreInfo);
         }
-    }, [scoreModal.nodeUuid, onConfirmScore]);
+        handleClosePopup();
+    }, [activePopup.nodeUuid, onConfirmScore, handleClosePopup]);
 
 
     useEffect(() => {
-        if (!contextMenu.isVisible && !canvasContextMenu.isVisible && !reviewContextMenu.isVisible && !remarkModal.isVisible && !scoreModal.isVisible) return;
+        if (!contextMenu.isVisible && !canvasContextMenu.isVisible && !activePopup.type) return;
 
         const handleClickOutside = (event: MouseEvent) => {
             const target = event.target as HTMLElement;
 
-            if (contextMenu.isVisible || canvasContextMenu.isVisible || reviewContextMenu.isVisible) {
-                 if (!target.closest('.context-menu') && !target.closest('.bulk-review-menu')) {
+            if (contextMenu.isVisible || canvasContextMenu.isVisible) {
+                 if (!target.closest('.context-menu')) {
                     handleCloseContextMenu();
                     handleCloseCanvasContextMenu();
-                    handleCloseReviewContextMenu();
                 }
             }
-            if (remarkModal.isVisible) {
-                if (!target.closest('.remark-modal')) {
-                    handleCloseRemarkModal();
-                }
-            }
-            if (scoreModal.isVisible) {
-                if (!target.closest('.score-modal')) {
-                    handleCloseScoreModal();
+            if (activePopup.type) {
+                const popupClasses = {
+                    review: '.bulk-review-menu',
+                    remark: '.remark-modal',
+                    score: '.score-modal'
+                };
+                if (!target.closest(popupClasses[activePopup.type])) {
+                    handleClosePopup();
                 }
             }
         };
@@ -770,7 +752,7 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
         return () => {
             window.removeEventListener('mousedown', handleClickOutside);
         };
-    }, [contextMenu.isVisible, canvasContextMenu.isVisible, reviewContextMenu.isVisible, remarkModal.isVisible, scoreModal.isVisible, handleCloseContextMenu, handleCloseCanvasContextMenu, handleCloseReviewContextMenu, handleCloseRemarkModal, handleCloseScoreModal]);
+    }, [contextMenu.isVisible, canvasContextMenu.isVisible, activePopup.type, handleCloseContextMenu, handleCloseCanvasContextMenu, handleClosePopup]);
 
 
     const handleWheel = (e: React.WheelEvent) => {
@@ -1020,20 +1002,10 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
         dispatch({ type: 'SET_TRANSFORM', payload: newTransform });
     }, [dispatch]);
 
-    const reviewContextMenuNode = useMemo(() => {
-        if (!reviewContextMenu.nodeUuid) return null;
-        return mindMapData.nodes[reviewContextMenu.nodeUuid] ?? null;
-    }, [reviewContextMenu.nodeUuid, mindMapData.nodes]);
-
-    const remarkModalNode = useMemo(() => {
-        if (!remarkModal.nodeUuid) return null;
-        return mindMapData.nodes[remarkModal.nodeUuid] ?? null;
-    }, [remarkModal.nodeUuid, mindMapData.nodes]);
-
-    const scoreModalNode = useMemo(() => {
-        if (!scoreModal.nodeUuid) return null;
-        return mindMapData.nodes[scoreModal.nodeUuid] ?? null;
-    }, [scoreModal.nodeUuid, mindMapData.nodes]);
+    const activePopupNode = useMemo(() => {
+        if (!activePopup.nodeUuid) return null;
+        return mindMapData.nodes[activePopup.nodeUuid] ?? null;
+    }, [activePopup.nodeUuid, mindMapData.nodes]);
 
 
     return (
@@ -1316,34 +1288,34 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
             
             {isShortcutsPanelVisible && <ShortcutsPanel position={shortcutsPanelPosition} onClose={handleCloseShortcutsPanel} />}
 
-            {reviewContextMenu.isVisible && reviewContextMenuNode && (
+            {activePopup.type === 'review' && activePopupNode && (
                 <ReviewMenu
-                    x={reviewContextMenu.x}
-                    y={reviewContextMenu.y}
-                    node={reviewContextMenuNode}
-                    onClose={handleCloseReviewContextMenu}
+                    x={activePopup.x}
+                    y={activePopup.y}
+                    node={activePopupNode}
+                    onClose={handleClosePopup}
                     onConfirm={handleConfirmReviewStatus}
-                    hasUseCases={reviewContextMenu.hasUseCases}
-                    nodeType={reviewContextMenu.nodeType}
+                    hasUseCases={activePopup.context?.hasUseCases ?? false}
+                    nodeType={activePopup.context?.nodeType ?? null}
                 />
             )}
 
-            {remarkModal.isVisible && remarkModalNode && (
+            {activePopup.type === 'remark' && activePopupNode && (
                 <RemarkModal
-                    x={remarkModal.x}
-                    y={remarkModal.y}
-                    node={remarkModalNode}
-                    onClose={handleCloseRemarkModal}
+                    x={activePopup.x}
+                    y={activePopup.y}
+                    node={activePopupNode}
+                    onClose={handleClosePopup}
                     onConfirm={handleConfirmRemark}
                 />
             )}
 
-            {scoreModal.isVisible && scoreModalNode && (
+            {activePopup.type === 'score' && activePopupNode && (
                 <ScoreModal
-                    x={scoreModal.x}
-                    y={scoreModal.y}
-                    node={scoreModalNode}
-                    onClose={handleCloseScoreModal}
+                    x={activePopup.x}
+                    y={activePopup.y}
+                    node={activePopupNode}
+                    onClose={handleClosePopup}
                     onConfirm={handleConfirmScore}
                 />
             )}

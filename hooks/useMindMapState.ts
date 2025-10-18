@@ -71,16 +71,23 @@ export const createHistoryReducer = (
                     present: action.payload,
                 };
             default: {
-                const newPresent = reducer(present, action as MindMapAction);
+                const mindMapAction = action as MindMapAction;
+                const newPresent = reducer(present, mindMapAction);
+
                 if (present === newPresent) {
                     return state;
                 }
 
-                if (ignoreActions.has((action as MindMapAction).type)) {
-                    // Update present state but don't modify history arrays
+                if (ignoreActions.has(mindMapAction.type)) {
+                    // This is a non-historic action. Apply it to all states
+                    // so the change persists across undo/redo operations.
+                    const newPast = past.map(p => reducer(p, mindMapAction));
+                    const newFuture = future.map(f => reducer(f, mindMapAction));
+                    
                     return {
-                        ...state,
+                        past: newPast,
                         present: newPresent,
+                        future: newFuture,
                     };
                 }
 

@@ -1476,7 +1476,7 @@ foreignObject[data-dragging='true'] {
   padding: 12px 14px; /* Reduced padding */
   display: flex;
   flex-direction: column;
-  overflow-y: auto;
+  overflow: hidden; /* Changed from auto to hidden */
   gap: 12px; /* Reduced gap */
 }
 
@@ -1484,6 +1484,7 @@ foreignObject[data-dragging='true'] {
   display: flex;
   gap: 8px;
   align-items: flex-start;
+  flex-shrink: 0; /* Prevent input from shrinking */
 }
 
 .remark-modal__input-area textarea {
@@ -1530,6 +1531,8 @@ foreignObject[data-dragging='true'] {
   gap: 12px; /* Reduced gap */
   border-top: 1px solid #f0f0f0;
   padding-top: 12px; /* Reduced padding */
+  overflow-y: auto; /* Make history scrollable */
+  padding-right: 5px; /* Add space for scrollbar */
 }
 .remark-modal__history:empty {
     display: none;

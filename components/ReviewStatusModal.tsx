@@ -1,6 +1,4 @@
-
-
-import React, { useState, useLayoutEffect, useRef } from 'react';
+import React, { useState, useLayoutEffect, useRef, useMemo } from 'react';
 import { FiInfo, FiX, FiAlertTriangle } from 'react-icons/fi';
 import type { ReviewStatusCode, MindMapNodeData, NodeType } from '../types';
 
@@ -14,17 +12,31 @@ interface ReviewMenuProps {
     nodeType: NodeType | null;
 }
 
-const statusOptions: { code: ReviewStatusCode; label: string; }[] = [
+const allStatusOptions: { code: ReviewStatusCode; label: string; }[] = [
     { code: 'pending_review', label: '待评审' },
     { code: 'approved', label: '通过' },
     { code: 'rejected', label: '未通过' },
 ];
 
 export const ReviewMenu: React.FC<ReviewMenuProps> = ({ x, y, node, onClose, onConfirm, hasUseCases, nodeType }) => {
-    const [selectedStatus, setSelectedStatus] = useState<ReviewStatusCode>(node.reviewStatusCode || 'pending_review');
-    const [showWarning, setShowWarning] = useState(false);
     const modalRef = useRef<HTMLDivElement>(null);
     const [position, setPosition] = useState({ top: y, left: x, opacity: 0 });
+    const [showWarning, setShowWarning] = useState(false);
+    
+    const isParentNode = useMemo(() => node.nodeType !== 'USE_CASE', [node.nodeType]);
+
+    const getInitialStatus = (): ReviewStatusCode => {
+        // If the node has a status, use it as the initial selection.
+        if (node.reviewStatusCode) {
+            return node.reviewStatusCode;
+        }
+        // If there's no status, default parent nodes to 'approved' for the initial selection,
+        // as 'pending' is not a valid manual choice. Default use cases to 'pending_review'.
+        return isParentNode ? 'approved' : 'pending_review';
+    };
+
+    const [selectedStatus, setSelectedStatus] = useState<ReviewStatusCode>(getInitialStatus());
+
 
     useLayoutEffect(() => {
         if (modalRef.current) {
@@ -52,9 +64,8 @@ export const ReviewMenu: React.FC<ReviewMenuProps> = ({ x, y, node, onClose, onC
     const handleStatusChange = (newStatus: ReviewStatusCode) => {
         setSelectedStatus(newStatus);
         const isChangingToPassOrFail = newStatus === 'approved' || newStatus === 'rejected';
-        const isBulkUpdate = node.nodeType !== 'USE_CASE';
-
-        if (isBulkUpdate && isChangingToPassOrFail && !hasUseCases) {
+        
+        if (isParentNode && isChangingToPassOrFail && !hasUseCases) {
             setShowWarning(true);
         } else {
             setShowWarning(false);
@@ -66,11 +77,10 @@ export const ReviewMenu: React.FC<ReviewMenuProps> = ({ x, y, node, onClose, onC
         onClose();
     };
 
-    const isUseCase = node.nodeType === 'USE_CASE';
-    const title = isUseCase ? '评审用例' : '一键评审用例';
-    const infoText = isUseCase 
-        ? '更新当前用例的评审状态' 
-        : '批量更新当前节点下所有用例的评审状态';
+    const title = isParentNode ? '一键评审用例' : '评审用例';
+    const infoText = isParentNode
+        ? '批量更新当前节点下所有用例的评审状态'
+        : '更新当前用例的评审状态';
 
     const warningText = nodeType === 'DEMAND'
         ? '存在模块下缺少用例，无法进行此操作。'
@@ -101,18 +111,28 @@ export const ReviewMenu: React.FC<ReviewMenuProps> = ({ x, y, node, onClose, onC
                 )}
 
                 <div className="bulk-review-menu__options">
-                    {statusOptions.map(({ code, label }) => (
-                        <div
-                            key={code}
-                            className={`bulk-review-menu__option ${selectedStatus === code ? 'bulk-review-menu__option--selected' : ''}`}
-                            onClick={() => handleStatusChange(code)}
-                        >
-                            <div className="bulk-review-menu__radio">
-                                {selectedStatus === code && <div className="bulk-review-menu__radio-dot" />}
+                    {allStatusOptions.map(({ code, label }) => {
+                        // The 'pending_review' option is disabled for parent nodes (demand, module, etc.).
+                        // It can be displayed as the current state but cannot be manually selected.
+                        const isDisabled = isParentNode && code === 'pending_review';
+
+                        return (
+                            <div
+                                key={code}
+                                className={`bulk-review-menu__option ${selectedStatus === code ? 'bulk-review-menu__option--selected' : ''} ${isDisabled ? 'bulk-review-menu__option--disabled' : ''}`}
+                                onClick={() => {
+                                    if (!isDisabled) {
+                                        handleStatusChange(code);
+                                    }
+                                }}
+                            >
+                                <div className="bulk-review-menu__radio">
+                                    {selectedStatus === code && <div className="bulk-review-menu__radio-dot" />}
+                                </div>
+                                <span>{label}</span>
                             </div>
-                            <span>{label}</span>
-                        </div>
-                    ))}
+                        );
+                    })}
                 </div>
             </div>
             <div className="bulk-review-menu__footer">

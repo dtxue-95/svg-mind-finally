@@ -715,8 +715,7 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
         if (activePopup.nodeUuid) {
             onConfirmRemark(activePopup.nodeUuid, content);
         }
-        handleClosePopup();
-    }, [activePopup.nodeUuid, onConfirmRemark, handleClosePopup]);
+    }, [activePopup.nodeUuid, onConfirmRemark]);
 
     const handleConfirmScore = useCallback((scoreInfo: ScoreInfo) => {
         if (activePopup.nodeUuid) {

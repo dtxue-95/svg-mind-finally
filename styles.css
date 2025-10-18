@@ -1310,10 +1310,6 @@ foreignObject[data-dragging='true'] {
 .bulk-review-menu__option:hover {
   border-color: #40a9ff;
 }
-.bulk-review-menu__option--selected {
-  border-color: #6c47ff;
-  box-shadow: 0 0 0 1px #6c47ff;
-}
 
 .bulk-review-menu__option--disabled {
   color: #b0b0b0;
@@ -1340,15 +1336,47 @@ foreignObject[data-dragging='true'] {
   justify-content: center;
   transition: border-color 0.2s;
 }
-.bulk-review-menu__option--selected .bulk-review-menu__radio {
-  border-color: #34c759;
-}
+
 .bulk-review-menu__radio-dot {
   width: 8px;
   height: 8px;
-  background-color: #34c759;
   border-radius: 50%;
 }
+
+/* Status-specific colors for selected option */
+.bulk-review-menu__option--selected-pending_review {
+  border-color: #ff9500; /* orange */
+  box-shadow: 0 0 0 1px #ff9500;
+}
+.bulk-review-menu__option--selected-pending_review .bulk-review-menu__radio {
+  border-color: #ff9500;
+}
+.bulk-review-menu__option--selected-pending_review .bulk-review-menu__radio-dot {
+  background-color: #ff9500;
+}
+
+.bulk-review-menu__option--selected-approved {
+  border-color: #34c759; /* green */
+  box-shadow: 0 0 0 1px #34c759;
+}
+.bulk-review-menu__option--selected-approved .bulk-review-menu__radio {
+  border-color: #34c759;
+}
+.bulk-review-menu__option--selected-approved .bulk-review-menu__radio-dot {
+  background-color: #34c759;
+}
+
+.bulk-review-menu__option--selected-rejected {
+  border-color: #ff3b30; /* red */
+  box-shadow: 0 0 0 1px #ff3b30;
+}
+.bulk-review-menu__option--selected-rejected .bulk-review-menu__radio {
+  border-color: #ff3b30;
+}
+.bulk-review-menu__option--selected-rejected .bulk-review-menu__radio-dot {
+  background-color: #ff3b30;
+}
+
 
 .bulk-review-menu__footer {
   display: flex;

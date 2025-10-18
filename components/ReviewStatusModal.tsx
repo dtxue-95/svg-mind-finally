@@ -115,11 +115,14 @@ export const ReviewMenu: React.FC<ReviewMenuProps> = ({ x, y, node, onClose, onC
                         // The 'pending_review' option is disabled for parent nodes (demand, module, etc.).
                         // It can be displayed as the current state but cannot be manually selected.
                         const isDisabled = isParentNode && code === 'pending_review';
+                        const selectedClass = selectedStatus === code 
+                            ? `bulk-review-menu__option--selected bulk-review-menu__option--selected-${code}` 
+                            : '';
 
                         return (
                             <div
                                 key={code}
-                                className={`bulk-review-menu__option ${selectedStatus === code ? 'bulk-review-menu__option--selected' : ''} ${isDisabled ? 'bulk-review-menu__option--disabled' : ''}`}
+                                className={`bulk-review-menu__option ${selectedClass} ${isDisabled ? 'bulk-review-menu__option--disabled' : ''}`}
                                 onClick={() => {
                                     if (!isDisabled) {
                                         handleStatusChange(code);

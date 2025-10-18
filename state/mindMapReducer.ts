@@ -401,49 +401,54 @@ export const mindMapReducer = (state: MindMapData, action: MindMapAction): MindM
             const { startNodeUuid, newStatus } = action.payload;
             const newStatusName = reviewStatusNameMapping[newStatus];
 
-            // 1. Find all descendant USE CASES.
+            // Find all descendant use cases. If none, no-op.
             const { uuids: useCaseUuids } = findAllDescendantUseCaseUuidsAndIds(state, startNodeUuid);
-            
             if (useCaseUuids.length === 0) {
-                return state; // No use cases to update.
+                return state;
             }
-            
+
             const newNodes = { ...state.nodes };
-            let changed = false;
-        
-            // 2. Set the status for all descendant use cases.
+
+            // Step 1: Update the status for all descendant use cases.
             useCaseUuids.forEach(uuid => {
                 const node = newNodes[uuid];
-                if (node && node.reviewStatusCode !== newStatus) {
+                if (node) {
                     newNodes[uuid] = {
                         ...node,
                         reviewStatusCode: newStatus,
                         reviewStatusName: newStatusName,
                     };
-                    changed = true;
                 }
             });
-        
-            if (!changed) {
-                return state;
-            }
-            
-            const tempMindMapForAggregation = { ...state, nodes: newNodes };
-            
-            // 3. Re-aggregate the status for the startNode itself.
-            const newStartNodeStatus = getAggregatedStatusRecursive(tempMindMapForAggregation, startNodeUuid);
-            const startNode = newNodes[startNodeUuid];
-            if (startNode.reviewStatusCode !== newStartNodeStatus) {
-                 newNodes[startNodeUuid] = {
-                    ...startNode,
-                    reviewStatusCode: newStartNodeStatus,
-                    reviewStatusName: reviewStatusNameMapping[newStartNodeStatus],
-                };
-            }
-        
-            // 4. Re-aggregate for all ancestors of the startNode.
+
+            // The map with updated use cases, which will be the source for aggregation.
+            const mapWithUpdatedUseCases = { ...state, nodes: newNodes };
+
+            // Step 2: Re-aggregate statuses for all intermediate parents within the subtree, including the start node.
+            // The recursive aggregation function handles the bottom-up calculation correctly.
+            const allSubtreeUuids = Array.from(findAllDescendantUuids(state, startNodeUuid));
+
+            allSubtreeUuids.forEach(uuid => {
+                const node = state.nodes[uuid];
+                // We only need to re-aggregate for nodes that can have children (i.e., not use cases).
+                if (node && node.nodeType !== 'USE_CASE') {
+                    const newAggregatedStatus = getAggregatedStatusRecursive(mapWithUpdatedUseCases, uuid);
+                    const currentNodeInCopy = newNodes[uuid];
+
+                    // Update the node in our working copy if its status has changed.
+                    if (currentNodeInCopy.reviewStatusCode !== newAggregatedStatus) {
+                        newNodes[uuid] = {
+                            ...currentNodeInCopy,
+                            reviewStatusCode: newAggregatedStatus,
+                            reviewStatusName: reviewStatusNameMapping[newAggregatedStatus],
+                        };
+                    }
+                }
+            });
+
+            // Step 3: Re-aggregate for all ancestors of the startNode, using the fully updated subtree.
             const finalNodes = updateAncestorReviewStatus({ ...state, nodes: newNodes }, startNodeUuid);
-        
+
             return {
                 ...state,
                 nodes: finalNodes,

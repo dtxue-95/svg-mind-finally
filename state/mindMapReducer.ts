@@ -1,5 +1,3 @@
-
-
 import type { MindMapData, MindMapNodeData, NodeType, NodePriority, ReviewStatusCode, Remark, ScoreInfo } from '../types';
 import { NODE_TYPE_PROPS } from '../constants';
 import { findAllDescendantUuids, findAllDescendantUseCaseUuidsAndIds } from '../utils/findAllDescendantIds';
@@ -36,47 +34,49 @@ const reviewStatusNameMapping: Record<ReviewStatusCode, string> = {
 // --- Review Status Aggregation Logic ---
 
 /**
- * Calculates the aggregated review status for a given node based on its descendant use cases.
+ * Recursively calculates the aggregated review status for a given node based on its direct children.
+ * This ensures that the entire hierarchy is considered, not just descendant use cases.
  * @param mindMap The full mind map data.
  * @param nodeUuid The UUID of the node to calculate the status for.
- * @returns The calculated ReviewStatusCode or null if no conclusion can be drawn.
+ * @returns The calculated ReviewStatusCode.
  */
-const getAggregatedReviewStatusForNode = (mindMap: MindMapData, nodeUuid: string): ReviewStatusCode | null => {
+const getAggregatedStatusRecursive = (mindMap: MindMapData, nodeUuid: string): ReviewStatusCode => {
     const node = mindMap.nodes[nodeUuid];
-    if (!node) return null;
-
-    if (node.nodeType === 'USE_CASE') {
-        return node.reviewStatusCode || null;
-    }
-
-    const { uuids: descendantUseCaseUuids } = findAllDescendantUseCaseUuidsAndIds(mindMap, nodeUuid);
-
-    if (descendantUseCaseUuids.length === 0) {
-        return node.reviewStatusCode || null; // No use cases below, it keeps its own status.
-    }
-    
-    const descendantStatuses = descendantUseCaseUuids
-        .map(uuid => mindMap.nodes[uuid]?.reviewStatusCode)
-        .filter((s): s is ReviewStatusCode => !!s);
-
-    if (descendantStatuses.length === 0) {
-        return node.reviewStatusCode || null;
-    }
-
-    // Priority: pending > rejected > approved
-    if (descendantStatuses.some(s => s === 'pending_review')) {
+    if (!node) {
+        // This case should ideally not be hit in a consistent data structure.
         return 'pending_review';
     }
-    if (descendantStatuses.some(s => s === 'rejected')) {
-        return 'rejected';
-    }
-    if (descendantStatuses.every(s => s === 'approved')) {
-        return 'approved';
+
+    // Base Case 1: A USE_CASE node's status is its own. Default to 'pending_review' if not set.
+    if (node.nodeType === 'USE_CASE') {
+        return node.reviewStatusCode || 'pending_review';
     }
 
-    // Default case for mixed statuses (e.g., some approved, some have no status)
+    const children = node.childNodeList?.map(uuid => mindMap.nodes[uuid]).filter(Boolean) ?? [];
+
+    // Base Case 2: If a non-use-case node has no children, it's considered incomplete and pending.
+    // This correctly handles empty modules or test points.
+    if (children.length === 0) {
+        return 'pending_review';
+    }
+
+    // Recursive Step: Aggregate statuses from all direct children.
+    const childStatuses = children.map(child => getAggregatedStatusRecursive(mindMap, child.uuid!));
+    
+    // Aggregation Logic (Priority: pending > rejected > approved)
+    if (childStatuses.some(s => s === 'pending_review')) {
+        return 'pending_review';
+    }
+    if (childStatuses.some(s => s === 'rejected')) {
+        return 'rejected';
+    }
+    if (childStatuses.every(s => s === 'approved')) {
+        return 'approved';
+    }
+    
+    // Fallback for any other mixed state, which shouldn't happen with the logic above.
     return 'pending_review';
-}
+};
 
 /**
  * Traverses up from a given node and updates the review status of all its ancestors.
@@ -92,8 +92,9 @@ const updateAncestorReviewStatus = (mindMap: MindMapData, startNodeUuid: string)
         const parentNode = newNodes[parentUuid];
         if (!parentNode) break;
 
-        const newStatus = getAggregatedReviewStatusForNode({ ...mindMap, nodes: newNodes }, parentUuid);
-        if (newStatus && newStatus !== parentNode.reviewStatusCode) {
+        const newStatus = getAggregatedStatusRecursive({ ...mindMap, nodes: newNodes }, parentUuid);
+        
+        if (newStatus !== parentNode.reviewStatusCode) {
             newNodes[parentUuid] = {
                 ...parentNode,
                 reviewStatusCode: newStatus,
@@ -400,17 +401,20 @@ export const mindMapReducer = (state: MindMapData, action: MindMapAction): MindM
             const { startNodeUuid, newStatus } = action.payload;
             const newStatusName = reviewStatusNameMapping[newStatus];
 
-            // Get the starting node and all its descendants.
-            const nodesToUpdateUuids = findAllDescendantUuids(state, startNodeUuid);
+            // 1. Find all descendant USE CASES.
+            const { uuids: useCaseUuids } = findAllDescendantUseCaseUuidsAndIds(state, startNodeUuid);
+            
+            if (useCaseUuids.length === 0) {
+                return state; // No use cases to update.
+            }
             
             const newNodes = { ...state.nodes };
             let changed = false;
         
-            nodesToUpdateUuids.forEach(uuid => {
+            // 2. Set the status for all descendant use cases.
+            useCaseUuids.forEach(uuid => {
                 const node = newNodes[uuid];
-                const relevantTypes: NodeType[] = ['DEMAND', 'MODULE', 'TEST_POINT', 'USE_CASE'];
-                
-                if (node && relevantTypes.includes(node.nodeType!) && node.reviewStatusCode !== newStatus) {
+                if (node && node.reviewStatusCode !== newStatus) {
                     newNodes[uuid] = {
                         ...node,
                         reviewStatusCode: newStatus,
@@ -423,8 +427,21 @@ export const mindMapReducer = (state: MindMapData, action: MindMapAction): MindM
             if (!changed) {
                 return state;
             }
+            
+            const tempMindMapForAggregation = { ...state, nodes: newNodes };
+            
+            // 3. Re-aggregate the status for the startNode itself.
+            const newStartNodeStatus = getAggregatedStatusRecursive(tempMindMapForAggregation, startNodeUuid);
+            const startNode = newNodes[startNodeUuid];
+            if (startNode.reviewStatusCode !== newStartNodeStatus) {
+                 newNodes[startNodeUuid] = {
+                    ...startNode,
+                    reviewStatusCode: newStartNodeStatus,
+                    reviewStatusName: reviewStatusNameMapping[newStartNodeStatus],
+                };
+            }
         
-            // After bulk setting, update ancestors based on the new state
+            // 4. Re-aggregate for all ancestors of the startNode.
             const finalNodes = updateAncestorReviewStatus({ ...state, nodes: newNodes }, startNodeUuid);
         
             return {

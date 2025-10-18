@@ -1,6 +1,6 @@
 import React from 'react';
 import {
-    FiPlus, FiTrash2, FiMaximize, FiMinimize, FiChevronsRight, FiEdit, FiPlay,
+    FiPlus, FiTrash2, FiMaximize, FiMinimize, FiChevronsRight, FiEdit, FiPlay, FiCheckCircle, FiCheckSquare,
 } from 'react-icons/fi';
 import { FaSitemap } from 'react-icons/fa6';
 import type { MindMapNodeData, NodeType, NodePriority } from '../types';
@@ -26,10 +26,13 @@ interface ContextMenuProps {
     onExecuteUseCase?: (nodeUuid: string) => void;
     enableUseCaseExecution?: boolean;
     isReadOnlyContext?: boolean;
+    onOpenReviewContextMenu: (nodeUuid: string, event: React.MouseEvent) => void;
+    enableBulkReviewContextMenu: boolean;
+    enableSingleReviewContextMenu: boolean;
 }
 
 export const ContextMenu: React.FC<ContextMenuProps> = ({
-    x, y, node, onClose, onAddChildNode, onAddSiblingNode, onDeleteNode, onToggleCollapse, onUpdateNodeType, onUpdateNodePriority, isRoot, isReadOnly, strictMode, priorityEditableNodeTypes, onExecuteUseCase, enableUseCaseExecution, isReadOnlyContext
+    x, y, node, onClose, onAddChildNode, onAddSiblingNode, onDeleteNode, onToggleCollapse, onUpdateNodeType, onUpdateNodePriority, isRoot, isReadOnly, strictMode, priorityEditableNodeTypes, onExecuteUseCase, enableUseCaseExecution, isReadOnlyContext, onOpenReviewContextMenu, enableBulkReviewContextMenu, enableSingleReviewContextMenu
 }) => {
     if (!node.uuid) return null;
 
@@ -41,17 +44,28 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
     const handleUpdateNodeType = (type: NodeType) => { onUpdateNodeType(node.uuid!, type); onClose(); };
     const handleUpdatePriority = (priorityLevel: NodePriority) => { onUpdateNodePriority(node.uuid!, priorityLevel); onClose(); };
     const handleExecute = () => { if(onExecuteUseCase) { onExecuteUseCase(node.uuid!); onClose(); } };
+    const handleOpenReview = (e: React.MouseEvent) => {
+        if (node.uuid) {
+            onOpenReviewContextMenu(node.uuid, e);
+        }
+        onClose();
+    };
 
     // --- Special render for read-only context ---
     if (isReadOnlyContext) {
-        // This is the special read-only menu. We already know the node is a use case.
-        // The menu item's disabled state depends only on whether execution is enabled via props.
+        const isUseCase = node.nodeType === 'USE_CASE';
+        const isParentForReview = ['DEMAND', 'MODULE', 'TEST_POINT'].includes(node.nodeType!);
+        const canExecute = enableUseCaseExecution && isUseCase;
+        const canBulkReview = enableBulkReviewContextMenu && isParentForReview;
+        const canSingleReview = enableSingleReviewContextMenu && isUseCase;
+
         return (
             <div className="context-menu" style={{ top: y, left: x }} onContextMenu={(e) => e.preventDefault()}>
                 <ul>
-                    <ContextMenuItem onClick={handleExecute} disabled={!enableUseCaseExecution}>
-                        <FiPlay /> 执行用例
-                    </ContextMenuItem>
+                    {canBulkReview && <ContextMenuItem onClick={handleOpenReview}><FiCheckCircle /> 一键评审用例</ContextMenuItem>}
+                    {canSingleReview && <ContextMenuItem onClick={handleOpenReview}><FiCheckSquare /> 评审用例</ContextMenuItem>}
+                    {canExecute && (canBulkReview || canSingleReview) && <ContextMenuItem isSeparator />}
+                    {canExecute && <ContextMenuItem onClick={handleExecute}><FiPlay /> 执行用例</ContextMenuItem>}
                 </ul>
             </div>
         );
@@ -70,6 +84,15 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
             addChildDisabled = true;
         }
     }
+    
+    // --- Visibility logic for review items ---
+    const isParentNode = ['DEMAND', 'MODULE', 'TEST_POINT'].includes(node.nodeType!);
+    const isUseCaseNode = node.nodeType === 'USE_CASE';
+    const showBulkReview = enableBulkReviewContextMenu && isParentNode;
+    const showSingleReview = enableSingleReviewContextMenu && isUseCaseNode;
+    const showExecuteUseCase = enableUseCaseExecution && isUseCaseNode;
+
+    const hasActionBlock = showBulkReview || showSingleReview || showExecuteUseCase;
 
     // --- Submenu Logic ---
     const isGeneralNode = node.nodeType === 'GENERAL';
@@ -139,7 +162,21 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
                     <FiTrash2 /> 删除节点
                 </ContextMenuItem>
                 
-                {node.nodeType === 'USE_CASE' && (
+                {hasActionBlock && <ContextMenuItem isSeparator />}
+                
+                {showBulkReview && (
+                    <ContextMenuItem onClick={handleOpenReview} disabled={isReadOnly}>
+                        <FiCheckCircle /> 一键评审用例
+                    </ContextMenuItem>
+                )}
+                
+                {showSingleReview && (
+                    <ContextMenuItem onClick={handleOpenReview} disabled={isReadOnly}>
+                        <FiCheckSquare /> 评审用例
+                    </ContextMenuItem>
+                )}
+
+                {showExecuteUseCase && (
                     <ContextMenuItem onClick={handleExecute} disabled={executeUseCaseDisabled}>
                         <FiPlay /> 执行用例
                     </ContextMenuItem>

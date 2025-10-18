@@ -1,5 +1,3 @@
-
-
 import React, { useImperativeHandle, forwardRef, useCallback, useState, useEffect, useMemo } from 'react';
 import { useMindMap } from './hooks/useMindMap';
 import { MindMapCanvas } from './components/MindMapCanvas';
@@ -74,6 +72,8 @@ interface AppProps {
     reviewStatusNodeTypes?: NodeType[];
     nodeRemarksNodeTypes?: NodeType[];
     nodeScoringNodeTypes?: NodeType[];
+    enableBulkReviewContextMenu?: boolean;
+    enableSingleReviewContextMenu?: boolean;
     children?: React.ReactNode;
 }
 
@@ -115,6 +115,8 @@ const App = forwardRef<AppRef, AppProps>(({
     reviewStatusNodeTypes = defaultReviewableNodeTypes,
     nodeRemarksNodeTypes = defaultNodeRemarksNodeTypes,
     nodeScoringNodeTypes = defaultNodeScoringNodeTypes,
+    enableBulkReviewContextMenu = true,
+    enableSingleReviewContextMenu = true,
     children,
 }, ref) => {
     // State to hold the data for the mind map. Initialized from props.
@@ -339,6 +341,8 @@ const App = forwardRef<AppRef, AppProps>(({
                 reviewStatusNodeTypes={reviewStatusNodeTypes}
                 nodeRemarksNodeTypes={nodeRemarksNodeTypes}
                 nodeScoringNodeTypes={nodeScoringNodeTypes}
+                enableBulkReviewContextMenu={enableBulkReviewContextMenu}
+                enableSingleReviewContextMenu={enableSingleReviewContextMenu}
             >
                 {children}
             </MindMapCanvas>

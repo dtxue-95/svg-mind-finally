@@ -207,6 +207,8 @@ root.render(<ComprehensiveExample />);
 | `nodeRemarksNodeTypes` | `NodeType[]` | 一个节点类型数组，用于指定哪些节点应显示备注图标。 | `['DEMAND', 'MODULE', 'TEST_POINT', 'USE_CASE']` |
 | `enableNodeScoring` | `boolean` | 是否为指定类型的节点启用评分图标和分数。 | `true` |
 | `nodeScoringNodeTypes` | `NodeType[]` | 一个节点类型数组，用于指定哪些节点应显示评分。 | `['DEMAND', 'MODULE', 'TEST_POINT', 'USE_CASE']` |
+| `enableBulkReviewContextMenu` | `boolean` | 是否在 DEMAND, MODULE, TEST_POINT 节点的右键菜单中显示“一键评审用例”选项。 | `true` |
+| `enableSingleReviewContextMenu` | `boolean` | 是否在 USE_CASE 节点的右键菜单中显示“评审用例”选项。 | `true` |
 | `enableReadOnlyUseCaseExecution` | `boolean`                            | 在只读模式下，是否允许通过右键菜单执行用例。                                                                                                                     | `true`                                                   |
 | `enableExpandCollapseByLevel` | `boolean`                               | 是否在画布右键菜单中启用“按节点类型展开/收起”的功能。                                                                                                            | `true`                                                   |
 | `strictMode`               | `boolean`                                  | 是否启用严格模式，强制执行节点层级规则。                                                                                                                         | `true`                                                   |

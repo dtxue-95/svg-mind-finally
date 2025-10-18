@@ -144,6 +144,8 @@ interface MindMapCanvasProps {
     reviewStatusNodeTypes: NodeType[];
     nodeRemarksNodeTypes: NodeType[];
     nodeScoringNodeTypes: NodeType[];
+    enableBulkReviewContextMenu: boolean;
+    enableSingleReviewContextMenu: boolean;
 }
 
 const SvgPath = React.memo(({ d, className }: { d: string, className: string }) => {
@@ -161,7 +163,7 @@ const AUTO_PAN_SPEED = 10;
 
 export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
     mindMapData, onAddChildNode, onAddSiblingNode, onDeleteNode, onFinishEditing, onUpdateNodePosition, onReparentNode, onReorderNode, onLayout, onUpdateNodeSize, onSave, showAITag, isDraggable = false, enableStrictDrag = false, enableNodeReorder = true, reorderableNodeTypes, showNodeType, showPriority, onToggleCollapse, onExpandNodes, onExpandAllNodes, onCollapseAllNodes, onExpandToLevel, onCollapseToLevel, onUpdateNodeType, onUpdateNodePriority, onConfirmReviewStatus, onConfirmRemark, onConfirmScore,
-    onUndo, onRedo, canUndo, canRedo, showTopToolbar, showBottomToolbar, topToolbarCommands, bottomToolbarCommands, strictMode = false, showContextMenu = true, showCanvasContextMenu = true, priorityEditableNodeTypes, onDataChange, onExecuteUseCase, enableUseCaseExecution, canvasBackgroundColor, showBackgroundDots, showMinimap, getNodeBackgroundColor, enableReadOnlyUseCaseExecution, enableExpandCollapseByLevel, isReadOnly, onToggleReadOnly, onSetReadOnly, isDirty, children, newlyAddedNodeUuid, onNodeFocused, showReadOnlyToggleButtons, showShortcutsButton, enableReviewStatus, enableNodeRemarks, enableNodeScoring, reviewStatusNodeTypes, nodeRemarksNodeTypes, nodeScoringNodeTypes
+    onUndo, onRedo, canUndo, canRedo, showTopToolbar, showBottomToolbar, topToolbarCommands, bottomToolbarCommands, strictMode = false, showContextMenu = true, showCanvasContextMenu = true, priorityEditableNodeTypes, onDataChange, onExecuteUseCase, enableUseCaseExecution, canvasBackgroundColor, showBackgroundDots, showMinimap, getNodeBackgroundColor, enableReadOnlyUseCaseExecution, enableExpandCollapseByLevel, isReadOnly, onToggleReadOnly, onSetReadOnly, isDirty, children, newlyAddedNodeUuid, onNodeFocused, showReadOnlyToggleButtons, showShortcutsButton, enableReviewStatus, enableNodeRemarks, enableNodeScoring, reviewStatusNodeTypes, nodeRemarksNodeTypes, nodeScoringNodeTypes, enableBulkReviewContextMenu, enableSingleReviewContextMenu
 }) => {
     const [canvasState, dispatch] = useReducer(canvasReducer, {
         rootUuid: mindMapData.rootUuid,
@@ -973,19 +975,29 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
     
     const handleNodeContextMenu = useCallback((nodeUuid: string, e: React.MouseEvent) => {
         if (!showContextMenu) return;
-
+        const node = mindMapData.nodes[nodeUuid];
+        if (!node) return;
+    
         if (isReadOnly) {
-            const node = mindMapData.nodes[nodeUuid];
-            if (enableReadOnlyUseCaseExecution && node && node.nodeType === 'USE_CASE') {
+            const isUseCase = node.nodeType === 'USE_CASE';
+            const isParentForReview = ['DEMAND', 'MODULE', 'TEST_POINT'].includes(node.nodeType!);
+    
+            const canExecute = enableReadOnlyUseCaseExecution && isUseCase;
+            const canBulkReview = enableBulkReviewContextMenu && isParentForReview;
+            const canSingleReview = enableSingleReviewContextMenu && isUseCase;
+            
+            // If any read-only action is possible, show the context menu.
+            if (canExecute || canBulkReview || canSingleReview) {
                 dispatch({ type: 'SELECT_NODE', payload: { nodeUuid } });
                 dispatch({ type: 'SHOW_CONTEXT_MENU', payload: { nodeUuid, x: e.clientX, y: e.clientY, isReadOnlyContext: true } });
             }
             return;
         }
-
+    
+        // Edit mode logic
         dispatch({ type: 'SELECT_NODE', payload: { nodeUuid } });
         dispatch({ type: 'SHOW_CONTEXT_MENU', payload: { nodeUuid, x: e.clientX, y: e.clientY, isReadOnlyContext: false } });
-    }, [showContextMenu, dispatch, isReadOnly, enableReadOnlyUseCaseExecution, mindMapData.nodes]);
+    }, [showContextMenu, isReadOnly, mindMapData.nodes, enableReadOnlyUseCaseExecution, enableBulkReviewContextMenu, enableSingleReviewContextMenu, dispatch]);
 
     const selectedNode: MindMapNodeData | null = selectedNodeUuid ? mindMapData.nodes[selectedNodeUuid] : null;
     const contextMenuNode = contextMenu.nodeUuid ? mindMapData.nodes[contextMenu.nodeUuid] : null;
@@ -1264,6 +1276,9 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
                     onExecuteUseCase={onExecuteUseCase}
                     enableUseCaseExecution={enableUseCaseExecution}
                     isReadOnlyContext={contextMenu.isReadOnlyContext}
+                    onOpenReviewContextMenu={handleOpenReviewContextMenu}
+                    enableBulkReviewContextMenu={enableBulkReviewContextMenu}
+                    enableSingleReviewContextMenu={enableSingleReviewContextMenu}
                 />
             )}
 

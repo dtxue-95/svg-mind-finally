@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import {
     FiPlus, FiTrash2, FiMaximize, FiMinimize, FiChevronsRight, FiEdit, FiPlay, FiCheckCircle, FiCheckSquare,
 } from 'react-icons/fi';
@@ -6,7 +6,7 @@ import { FaSitemap } from 'react-icons/fa6';
 import type { MindMapNodeData, NodeType, NodePriority } from '../types';
 import { NODE_TYPE_PROPS, PRIORITY_PROPS } from '../constants';
 import { ContextMenuItem } from './ContextMenuItem';
-
+import { usePopoverPositioning } from '../hooks/usePopoverPositioning';
 
 interface ContextMenuProps {
     x: number;
@@ -34,6 +34,9 @@ interface ContextMenuProps {
 export const ContextMenu: React.FC<ContextMenuProps> = ({
     x, y, node, onClose, onAddChildNode, onAddSiblingNode, onDeleteNode, onToggleCollapse, onUpdateNodeType, onUpdateNodePriority, isRoot, isReadOnly, strictMode, priorityEditableNodeTypes, onExecuteUseCase, enableUseCaseExecution, isReadOnlyContext, onOpenReviewContextMenu, enableBulkReviewContextMenu, enableSingleReviewContextMenu
 }) => {
+    const menuRef = useRef<HTMLDivElement>(null);
+    const style = usePopoverPositioning(menuRef, x, y);
+
     if (!node.uuid) return null;
 
     // --- Command Handlers ---
@@ -60,7 +63,7 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
         const canSingleReview = enableSingleReviewContextMenu && isUseCase;
 
         return (
-            <div className="context-menu" style={{ top: y, left: x }} onContextMenu={(e) => e.preventDefault()}>
+            <div ref={menuRef} className="context-menu" style={style} onContextMenu={(e) => e.preventDefault()}>
                 <ul>
                     {canBulkReview && <ContextMenuItem onClick={handleOpenReview}><FiCheckCircle /> 一键评审用例</ContextMenuItem>}
                     {canSingleReview && <ContextMenuItem onClick={handleOpenReview}><FiCheckSquare /> 评审用例</ContextMenuItem>}
@@ -137,7 +140,7 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
 
 
     return (
-        <div className="context-menu" style={{ top: y, left: x }} onContextMenu={(e) => e.preventDefault()}>
+        <div ref={menuRef} className="context-menu" style={style} onContextMenu={(e) => e.preventDefault()}>
             <ul>
                 <ContextMenuItem onClick={handleAddSibling} disabled={addSiblingDisabled}>
                     <FiPlus /> 添加同级节点

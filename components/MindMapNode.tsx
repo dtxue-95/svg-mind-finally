@@ -1,5 +1,3 @@
-
-
 import React, { useState, useEffect, useRef, useLayoutEffect, useCallback } from 'react';
 import type { MindMapNodeData } from '../types';
 import { NODE_TYPE_PROPS, PRIORITY_PROPS, MIN_NODE_HEIGHT, MAX_NODE_WIDTH, MIN_NODE_WIDTH } from '../constants';
@@ -35,6 +33,8 @@ interface MindMapNodeProps {
     onOpenReviewContextMenu: (nodeUuid: string, event: React.MouseEvent) => void;
     onOpenRemarkModal: (nodeUuid: string, event: React.MouseEvent) => void;
     onOpenScoreModal: (nodeUuid: string, event: React.MouseEvent) => void;
+    isNewlyAdded: boolean;
+    onNodeFocused: () => void;
 }
 
 const STATUS_COLOR_PROPS: Record<string, { color: string; backgroundColor: string; }> = {
@@ -54,7 +54,7 @@ const STATUS_COLOR_PROPS: Record<string, { color: string; backgroundColor: strin
 };
 
 const MindMapNodeComponent: React.FC<MindMapNodeProps> = ({
-    node, isSelected, isBeingDragged, onSelect, onFinishEditing, onDragStart, onUpdateSize, showAITag, isReadOnly, isDraggable, isSearchMatch, isCurrentSearchMatch, searchQuery, showNodeType = true, showPriority = true, onReadOnlyPanStart, onToggleCollapse, descendantCount, onContextMenu, isPossibleDropTarget, isValidDropTarget, isInvalidDropTarget, getNodeBackgroundColor, showReviewStatus, showRemarkIcon, showScoreInfo, onOpenReviewContextMenu, onOpenRemarkModal, onOpenScoreModal
+    node, isSelected, isBeingDragged, onSelect, onFinishEditing, onDragStart, onUpdateSize, showAITag, isReadOnly, isDraggable, isSearchMatch, isCurrentSearchMatch, searchQuery, showNodeType = true, showPriority = true, onReadOnlyPanStart, onToggleCollapse, descendantCount, onContextMenu, isPossibleDropTarget, isValidDropTarget, isInvalidDropTarget, getNodeBackgroundColor, showReviewStatus, showRemarkIcon, showScoreInfo, onOpenReviewContextMenu, onOpenRemarkModal, onOpenScoreModal, isNewlyAdded, onNodeFocused
 }) => {
     const [isEditing, setIsEditing] = useState(false);
     const [name, setName] = useState(node.name ?? '');
@@ -154,6 +154,15 @@ const MindMapNodeComponent: React.FC<MindMapNodeProps> = ({
         }
     }, [isEditing]);
     
+    // Effect for auto-editing newly added nodes
+    useEffect(() => {
+        if (isNewlyAdded && !isReadOnly) {
+            editingStartState.current = { name: node.name ?? '', width: node.width!, height: node.height! };
+            setIsEditing(true);
+            onNodeFocused(); // Notify parent that the node has been "focused"
+        }
+    }, [isNewlyAdded, isReadOnly, onNodeFocused, node.name, node.width, node.height]);
+
     // This effect resizes the textarea element itself to show all content.
     const autoResizeTextarea = () => {
         if (textareaRef.current) {

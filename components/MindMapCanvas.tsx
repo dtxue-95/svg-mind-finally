@@ -12,7 +12,7 @@ import { ShortcutsModal as ShortcutsPanel } from './ShortcutsModal';
 import { ReviewMenu } from './ReviewStatusModal';
 import { RemarkModal } from './RemarkModal';
 import { ScoreModal } from './ScoreModal';
-import { generateElbowPath } from '../utils/generateElbowPath';
+import { generateCurvePath } from '../utils/generateElbowPath';
 import { canvasReducer } from '../state/canvasReducer';
 import { getInitialCanvasState } from '../state/canvasState';
 import { countAllDescendants, findAllDescendantUuids, findAllAncestorUuids, hasUseCaseDescendant, isDemandNodeReadyForReview } from '../utils/findAllDescendantIds';
@@ -351,7 +351,7 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
             dispatch({ type: 'SET_TRANSFORM', payload: newTransform });
 
             // 4. Notify the parent component that focusing is complete to reset the trigger state.
-            onNodeFocused();
+            // This is now handled inside MindMapNode to trigger auto-edit.
         }
     }, [newlyAddedNodeUuid, mindMapData, onNodeFocused, transform.scale, dispatch, onExpandNodes]);
 
@@ -1084,33 +1084,28 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
                     transform: `translate(${transform.translateX}px, ${transform.translateY}px) scale(${transform.scale})`,
                     transition: (canvasState.isPanning || !!dragState) ? 'none' : 'transform 0.3s ease'
                 }}>
-                    {Object.values(mindMapData.nodes)
-                        .filter(node => {
-                            if (!node.parentUuid || !mindMapData.nodes[node.parentUuid] || !visibleNodeUuids.has(node.uuid!)) {
-                                return false;
-                            }
-                            if (node.uuid === dragState?.nodeUuid) {
-                                return false;
-                            }
-                            return true;
-                        })
-                        .map(node => {
-                            const isDragged = draggedSubtreeUuids.has(node.uuid!);
-                            const d = generateElbowPath(mindMapData.nodes[node.parentUuid!], node);
-                            const className = `mind-map-canvas__connector ${isDragged ? 'mind-map-canvas__connector--dragging' : ''}`;
-                            const dragTransform = isDragged && dragState?.offset ? `translate(${dragState.offset.dx}, ${dragState.offset.dy})` : undefined;
+                    {Array.from(visibleNodeUuids).map(nodeUuid => {
+                        const node = mindMapData.nodes[nodeUuid];
+                        if (!node || !node.parentUuid || !mindMapData.nodes[node.parentUuid] || node.uuid === dragState?.nodeUuid) {
+                            return null;
+                        }
+                        
+                        const isDragged = draggedSubtreeUuids.has(node.uuid!);
+                        const d = generateCurvePath(mindMapData.nodes[node.parentUuid!], node);
+                        const className = `mind-map-canvas__connector ${isDragged ? 'mind-map-canvas__connector--dragging' : ''}`;
+                        const dragTransform = isDragged && dragState?.offset ? `translate(${dragState.offset.dx}, ${dragState.offset.dy})` : undefined;
 
-                            if (isDragged) {
-                                return (
-                                    <g key={`${node.parentUuid}-${node.uuid}`} transform={dragTransform}>
-                                        <SvgPath d={d} className={className} />
-                                    </g>
-                                );
-                            }
+                        if (isDragged) {
                             return (
-                                <SvgPath key={`${node.parentUuid}-${node.uuid}`} d={d} className={className} />
+                                <g key={`${node.parentUuid}-${node.uuid}`} transform={dragTransform}>
+                                    <SvgPath d={d} className={className} />
+                                </g>
                             );
-                        })}
+                        }
+                        return (
+                            <SvgPath key={`${node.parentUuid}-${node.uuid}`} d={d} className={className} />
+                        );
+                    })}
                     
                     {(() => {
                         if (!(dragState?.dropTarget?.type === 'reparent' && dragState.offset)) {
@@ -1130,7 +1125,7 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
 
                         return (
                             <SvgPath
-                                d={generateElbowPath(sourceNodeForPreview, targetNodeForPreview as MindMapNodeData)}
+                                d={generateCurvePath(sourceNodeForPreview, targetNodeForPreview as MindMapNodeData)}
                                 className="mind-map-canvas__connector mind-map-canvas__connector--preview"
                             />
                         );
@@ -1218,6 +1213,8 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
                                     onOpenReviewContextMenu={handleOpenReviewContextMenu}
                                     onOpenRemarkModal={handleOpenRemarkModal}
                                     onOpenScoreModal={handleOpenScoreModal}
+                                    isNewlyAdded={node.uuid === newlyAddedNodeUuid}
+                                    onNodeFocused={onNodeFocused}
                                 />
                             </div>
                          </foreignObject>

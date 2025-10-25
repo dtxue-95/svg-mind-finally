@@ -1,7 +1,7 @@
-
-import React, { useState, useRef, useLayoutEffect } from 'react';
+import React, { useState, useRef } from 'react';
 import { FiStar, FiX } from 'react-icons/fi';
 import type { MindMapNodeData, ScoreInfo } from '../types';
+import { usePopoverPositioning } from '../hooks/usePopoverPositioning';
 
 interface ScoreModalProps {
     x: number;
@@ -25,30 +25,7 @@ export const ScoreModal: React.FC<ScoreModalProps> = ({ x, y, node, onClose, onC
     const [hoverRating, setHoverRating] = useState(0);
     const [remark, setRemark] = useState(node.scoreInfo?.remark || '');
     const modalRef = useRef<HTMLDivElement>(null);
-    const [position, setPosition] = useState({ top: y, left: x, opacity: 0 });
-
-    useLayoutEffect(() => {
-        if (modalRef.current) {
-            const modalRect = modalRef.current.getBoundingClientRect();
-            const viewportWidth = window.innerWidth;
-            const viewportHeight = window.innerHeight;
-
-            let finalX = x;
-            let finalY = y;
-
-            if (finalX + modalRect.width > viewportWidth) {
-                finalX = viewportWidth - modalRect.width - 10;
-            }
-            if (finalY + modalRect.height > viewportHeight) {
-                finalY = viewportHeight - modalRect.height - 10;
-            }
-
-            finalX = Math.max(10, finalX);
-            finalY = Math.max(10, finalY);
-
-            setPosition({ top: finalY, left: finalX, opacity: 1 });
-        }
-    }, [x, y]);
+    const position = usePopoverPositioning(modalRef, x, y);
 
     const ratingLabel = scoreMappings[hoverRating || rating]?.scoreName || '未选择';
 
@@ -73,7 +50,7 @@ export const ScoreModal: React.FC<ScoreModalProps> = ({ x, y, node, onClose, onC
         <div 
             ref={modalRef}
             className="score-modal" 
-            style={{ top: position.top, left: position.left, opacity: position.opacity, transition: 'opacity 0.1s' }} 
+            style={{ ...position, transition: 'opacity 0.1s' }} 
             onClick={e => e.stopPropagation()} 
             onContextMenu={(e) => e.preventDefault()}
             onWheel={handleWheel}

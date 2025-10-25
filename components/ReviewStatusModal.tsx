@@ -1,6 +1,7 @@
-import React, { useState, useLayoutEffect, useRef, useMemo } from 'react';
+import React, { useState, useRef, useMemo } from 'react';
 import { FiInfo, FiX, FiAlertTriangle } from 'react-icons/fi';
 import type { ReviewStatusCode, MindMapNodeData, NodeType } from '../types';
+import { usePopoverPositioning } from '../hooks/usePopoverPositioning';
 
 interface ReviewMenuProps {
     x: number;
@@ -20,7 +21,7 @@ const allStatusOptions: { code: ReviewStatusCode; label: string; }[] = [
 
 export const ReviewMenu: React.FC<ReviewMenuProps> = ({ x, y, node, onClose, onConfirm, hasUseCases, nodeType }) => {
     const modalRef = useRef<HTMLDivElement>(null);
-    const [position, setPosition] = useState({ top: y, left: x, opacity: 0 });
+    const position = usePopoverPositioning(modalRef, x, y);
     const [showWarning, setShowWarning] = useState(false);
     
     const isParentNode = useMemo(() => node.nodeType !== 'USE_CASE', [node.nodeType]);
@@ -36,30 +37,6 @@ export const ReviewMenu: React.FC<ReviewMenuProps> = ({ x, y, node, onClose, onC
     };
 
     const [selectedStatus, setSelectedStatus] = useState<ReviewStatusCode>(getInitialStatus());
-
-
-    useLayoutEffect(() => {
-        if (modalRef.current) {
-            const modalRect = modalRef.current.getBoundingClientRect();
-            const viewportWidth = window.innerWidth;
-            const viewportHeight = window.innerHeight;
-
-            let finalX = x;
-            let finalY = y;
-
-            if (finalX + modalRect.width > viewportWidth) {
-                finalX = viewportWidth - modalRect.width - 10;
-            }
-            if (finalY + modalRect.height > viewportHeight) {
-                finalY = viewportHeight - modalRect.height - 10;
-            }
-
-            finalX = Math.max(10, finalX);
-            finalY = Math.max(10, finalY);
-
-            setPosition({ top: finalY, left: finalX, opacity: 1 });
-        }
-    }, [x, y]);
 
     const handleStatusChange = (newStatus: ReviewStatusCode) => {
         setSelectedStatus(newStatus);
@@ -90,7 +67,7 @@ export const ReviewMenu: React.FC<ReviewMenuProps> = ({ x, y, node, onClose, onC
         <div 
             ref={modalRef}
             className="bulk-review-menu" 
-            style={{ top: position.top, left: position.left, opacity: position.opacity, transition: 'opacity 0.1s' }} 
+            style={{ ...position, transition: 'opacity 0.1s' }} 
             onContextMenu={(e) => e.preventDefault()}
         >
             <div className="bulk-review-menu__header">

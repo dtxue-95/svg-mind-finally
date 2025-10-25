@@ -1,3 +1,5 @@
+
+
 import type { MindMapData, MindMapNodeData, NodeType, NodePriority, ReviewStatusCode, Remark, ScoreInfo } from '../types';
 import { NODE_TYPE_PROPS } from '../constants';
 import { findAllDescendantUuids, findAllDescendantUseCaseUuidsAndIds } from '../utils/findAllDescendantIds';
@@ -20,7 +22,8 @@ export type MindMapAction =
     | { type: 'BULK_UPDATE_REVIEW_STATUS'; payload: { startNodeUuid: string; newStatus: ReviewStatusCode; } }
     | { type: 'UPDATE_SINGLE_NODE_REVIEW_STATUS'; payload: { nodeUuid: string; newStatus: ReviewStatusCode } }
     | { type: 'ADD_REMARK'; payload: { nodeUuid: string, remark: Remark } }
-    | { type: 'UPDATE_SCORE_INFO'; payload: { nodeUuid: string, scoreInfo: ScoreInfo } };
+    | { type: 'UPDATE_SCORE_INFO'; payload: { nodeUuid: string, scoreInfo: ScoreInfo } }
+    | { type: 'PARTIAL_UPDATE_NODE', payload: { nodeUuid: string, partialData: Partial<MindMapNodeData> } };
 
 // Defines the logical hierarchy of node types for level-based operations.
 const typeHierarchy: NodeType[] = ['DEMAND', 'MODULE', 'TEST_POINT', 'USE_CASE', 'PRECONDITION', 'STEP', 'EXPECTED_RESULT'];
@@ -513,6 +516,22 @@ export const mindMapReducer = (state: MindMapData, action: MindMapAction): MindM
                         scoreInfo,
                         hasScore: true,
                     },
+                },
+            };
+        }
+
+        case 'PARTIAL_UPDATE_NODE': {
+            const { nodeUuid, partialData } = action.payload;
+            const node = state.nodes[nodeUuid];
+            if (!node) return state;
+
+            const updatedNode = { ...node, ...partialData };
+
+            return {
+                ...state,
+                nodes: {
+                    ...state.nodes,
+                    [nodeUuid]: updatedNode,
                 },
             };
         }

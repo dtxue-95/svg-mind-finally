@@ -32,6 +32,7 @@ export interface AppRef {
   getReviewStatusUpdateInfo: (nodeUuid: string, newStatus: ReviewStatusCode) => DataChangeInfo | null;
   confirmRemark: (nodeUuid: string, content: string) => void;
   confirmScore: (nodeUuid: string, scoreInfo: ScoreInfo) => void;
+  partialUpdateNodeData: (nodeUuid: string, partialData: Partial<MindMapNodeData>) => void;
 }
 
 interface AppProps {
@@ -162,6 +163,7 @@ const App = forwardRef<AppRef, AppProps>(({
         getReviewStatusUpdateInfo,
         confirmRemark,
         confirmScore,
+        partialUpdateNode,
         undo,
         redo,
         canUndo,
@@ -263,7 +265,10 @@ const App = forwardRef<AppRef, AppProps>(({
         confirmScore: (nodeUuid: string, scoreInfo: ScoreInfo) => {
             confirmScore(nodeUuid, scoreInfo);
         },
-    }), [constructSavePayload, enableUseCaseExecution, handleExecuteUseCase, resetHistory, confirmReviewStatus, getReviewStatusUpdateInfo, confirmRemark, confirmScore]);
+        partialUpdateNodeData: (nodeUuid: string, partialData: Partial<MindMapNodeData>) => {
+            partialUpdateNode(nodeUuid, partialData);
+        },
+    }), [constructSavePayload, enableUseCaseExecution, handleExecuteUseCase, resetHistory, confirmReviewStatus, getReviewStatusUpdateInfo, confirmRemark, confirmScore, partialUpdateNode]);
 
     const handleSaveRequest = () => {
         if (onSave) {

@@ -273,6 +273,7 @@ export interface AppRef {
   getReviewStatusUpdateInfo: (nodeUuid: string, newStatus: ReviewStatusCode) => DataChangeInfo | null;
   confirmRemark: (nodeUuid: string, content: string) => void;
   confirmScore: (nodeUuid: string, scoreInfo: ScoreInfo) => void;
+  partialUpdateNodeData: (nodeUuid: string, partialData: Partial<MindMapNodeData>) => void;
 }
 ```
 
@@ -313,6 +314,11 @@ export interface AppRef {
 -   **`confirmScore(nodeUuid: string, scoreInfo: ScoreInfo)`**
     -   **作用**: 命令式地为节点添加或更新评分。
     -   **用途**: 从外部UI提交评分。
+    
+-   **`partialUpdateNodeData(nodeUuid, partialData)`**
+    -   **作用**: **局部增量更新**指定节点的数据，而**不会触发界面重绘或创建撤销/重做历史记录**。它会直接合并 `partialData` 到现有节点数据中。
+    -   **用途**: **核心用途**是从后端同步数据（如数据库 `id`）回写到节点中，而不会干扰用户的当前操作。例如，在用户评分后，API 返回了该评分记录的 `id`，可以使用此方法将其无缝地更新到节点的 `scoreInfo` 对象中。
+    -   **注意**: 尽管此更新是“静默的”（无重绘、无历史记录），但它**仍然会触发 `onDataChange` 回调**，`operationType` 为 `PARTIAL_UPDATE_NODE`。
 
 ---
 
@@ -365,6 +371,108 @@ export interface AppRef {
     -   相应的 `onConfirm...` 回调（如 `onConfirmReviewStatus`）会被触发，并附带包含变更详情的 `DataChangeInfo` 对象。
 4.  **外部处理**: 在回调函数中，你可以获取 `info` 对象并调用 API 将变更同步到后端。
 5.  **命令式操作**: 你也可以通过 `ref` 上的相应方法（如 `ref.current.confirmRemark(...)`）从外部直接触发这些操作。
+
+---
+
+## 高级工作流：实现评分与ID回写
+
+这是一个常见的真实场景：用户在界面上进行操作（如评分），前端将数据发送到后端保存，后端返回一个数据库 `id`，前端需要将这个 `id` 更新回对应的数据项中，以便后续的更新或删除操作。`partialUpdateNodeData` 方法正是为此设计的。
+
+**工作流程如下:**
+
+1.  **用户操作**: 用户点击节点上的评分图标，打开评分弹窗，选择星级、填写备注，然后点击“提交”。
+2.  **触发回调**: 组件触发 `onConfirmScore` 回调。此时传递的 `DataChangeInfo` 中的 `currentNode.scoreInfo` 对象包含了用户输入的所有信息，但**没有 `id`**。
+3.  **调用API**: 在 `onConfirmScore` 函数内部，你调用后端 API 来保存这个 `scoreInfo` 数据。
+4.  **API返回ID**: 后端处理请求，将评分数据存入数据库，并返回生成的唯一 `id`。
+5.  **回写ID**: API 调用成功后，在 `onConfirmScore` 函数中，使用 `ref.current.partialUpdateNodeData()` 方法，将包含新 `id` 的 `scoreInfo` 对象“静默”地更新回对应的节点中。
+
+这个过程对用户是无感的，不会导致画布重绘或历史状态污染，但能确保前端数据与后端保持同步。
+
+### 示例代码
+
+```jsx
+import React, { useRef, useEffect } from 'react';
+import App, { AppRef, DataChangeInfo, RawNode } from './App';
+import { mockInitialData } from './mockData'; // 假设 mockData 存在
+
+// 模拟一个保存评分的后端 API
+const fakeScoreApi = {
+  saveScore: (nodeUuid: string, scoreInfo: any): Promise<{ success: boolean; id: number }> => {
+    console.log(`正在为节点 ${nodeUuid} 保存评分:`, scoreInfo);
+    return new Promise(resolve => {
+      setTimeout(() => {
+        const newId = Math.floor(Math.random() * 1000) + 1; // 生成一个随机 ID
+        console.log(`API 返回成功，新的评分 ID 是: ${newId}`);
+        resolve({ success: true, id: newId });
+      }, 500); // 模拟网络延迟
+    });
+  }
+};
+
+function ScoringExample() {
+  const mindMapRef = useRef<AppRef>(null);
+
+  // 组件加载后自动进入编辑模式，方便演示
+  useEffect(() => {
+    setTimeout(() => {
+        mindMapRef.current?.setReadOnly(false);
+    }, 100);
+  }, []);
+
+  // 核心逻辑：处理评分确认事件
+  const handleConfirmScore = async (info: DataChangeInfo) => {
+    // 1. 从回调信息中获取当前操作的节点和评分数据
+    const currentNode = info.currentNode; // 这是 RawNode 格式
+    if (!currentNode || !currentNode.uuid || !currentNode.scoreInfo) {
+      console.error("无法获取评分节点信息。");
+      return;
+    }
+    
+    // scoreInfo 在回调时还没有 id
+    console.log("onConfirmScore 触发，此时 scoreInfo:", currentNode.scoreInfo);
+
+    try {
+      // 2. 调用后端 API 保存评分，并等待返回结果
+      const result = await fakeScoreApi.saveScore(currentNode.uuid, currentNode.scoreInfo);
+
+      if (result.success) {
+        // 3. API 调用成功，获取返回的 id
+        const newScoreId = result.id;
+        
+        // 4. 使用 partialUpdateNodeData 将 id 回写到节点的 scoreInfo 中
+        //    注意：这里需要构造一个符合 MindMapNodeData 结构的 partialData
+        const partialDataToUpdate = {
+          scoreInfo: {
+            ...currentNode.scoreInfo, // 保留用户输入的其他评分信息
+            id: newScoreId,         // 添加后端返回的 id
+          }
+        };
+
+        console.log(`准备使用 partialUpdateNodeData 回写 ID，更新数据:`, partialDataToUpdate);
+        mindMapRef.current?.partialUpdateNodeData(currentNode.uuid, partialDataToUpdate);
+        
+        // 你可以在 onDataChange 回调中监听 OperationType.PARTIAL_UPDATE_NODE
+        // 来验证数据是否已在内部状态中更新。
+      } else {
+        alert("评分保存失败！");
+      }
+    } catch (error) {
+      console.error("保存评分时出错:", error);
+      alert("评分保存时发生网络错误。");
+    }
+  };
+
+  return (
+    <div style={{width: '100%', height: '100vh'}}>
+      <App
+        ref={mindMapRef}
+        initialData={mockInitialData}
+        onConfirmScore={handleConfirmScore}
+      />
+    </div>
+  );
+}
+```
 
 ---
 
@@ -490,6 +598,7 @@ interface RawNode {
 | `UPDATE_SINGLE_NODE_REVIEW_STATUS` | 更新了单个用例的评审状态（并向上聚合）   |
 | `ADD_REMARK`                       | 添加了备注                               |
 | `UPDATE_SCORE_INFO`                | 更新了评分                               |
+| `PARTIAL_UPDATE_NODE`              | 执行了局部增量更新                       |
 
 ### 可定制命令 (`CommandId`)
 

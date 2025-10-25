@@ -169,6 +169,7 @@ export enum OperationType {
   UPDATE_SINGLE_NODE_REVIEW_STATUS = 'UPDATE_SINGLE_NODE_REVIEW_STATUS',
   ADD_REMARK = 'ADD_REMARK',
   UPDATE_SCORE_INFO = 'UPDATE_SCORE_INFO',
+  PARTIAL_UPDATE_NODE = 'PARTIAL_UPDATE_NODE',
 }
 
 // New types for the data sent in the callback, using raw keys

@@ -17,6 +17,7 @@ const historicMindMapReducer = createHistoryReducer(mindMapReducer, {
         'UPDATE_SINGLE_NODE_REVIEW_STATUS',
         'ADD_REMARK',
         'UPDATE_SCORE_INFO',
+        'PARTIAL_UPDATE_NODE',
     ],
 });
 const emptyMindMap: MindMapData = { rootUuid: '', nodes: {} };
@@ -740,6 +741,40 @@ export const useMindMap = (
         dispatch(action);
     }, [dispatch]);
 
+    const partialUpdateNode = useCallback((nodeUuid: string, partialData: Partial<MindMapNodeData>) => {
+        const currentMindMap = mindMapRef.current;
+        const node = currentMindMap.nodes[nodeUuid];
+        if (!node) return;
+
+        const action: MindMapAction = { type: 'PARTIAL_UPDATE_NODE', payload: { nodeUuid, partialData } };
+        const nextState = mindMapReducer(currentMindMap, action);
+
+        if (onDataChangeRef.current) {
+            const nodeAfter = nextState.nodes[nodeUuid];
+            const parentNode = nodeAfter.parentUuid ? nextState.nodes[nodeAfter.parentUuid] : undefined;
+            const chain = getNodeChainByUuid(nextState, nodeUuid);
+
+            const info = {
+                operationType: OperationType.PARTIAL_UPDATE_NODE,
+                timestamp: Date.now(),
+                description: `Partially updated data for node '${nodeAfter.name}'`,
+                previousData: currentMindMap,
+                currentData: nextState,
+                affectedNodeUuids: [nodeUuid],
+                updatedNodes: [nodeAfter],
+                currentNode: nodeAfter,
+                parentNode: parentNode,
+                uuidChain: chain.uuids,
+                uuidChainNodes: chain.nodes,
+                parentUuidChain: chain.uuids.slice(0, -1),
+                parentUuidChainNodes: chain.nodes.slice(0, -1),
+            };
+            onDataChangeRef.current(convertDataChangeInfo(info));
+        }
+        
+        dispatch(action);
+    }, [dispatch]);
+
 
     const resetHistory = useCallback(() => {
         dispatch({ type: 'CLEAR_HISTORY' });
@@ -769,6 +804,7 @@ export const useMindMap = (
         getReviewStatusUpdateInfo,
         confirmRemark,
         confirmScore,
+        partialUpdateNode,
         undo,
         redo,
         canUndo,

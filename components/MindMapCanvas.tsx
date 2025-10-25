@@ -1,5 +1,5 @@
 import React, { useCallback, useRef, useEffect, useReducer, useMemo, useState } from 'react';
-import type { MindMapData, CommandId, MindMapNodeData, NodeType, NodePriority, DataChangeCallback, CanvasTransform, ReviewStatusCode, ScoreInfo } from '../types';
+import type { MindMapData, CommandId, MindMapNodeData, NodeType, NodePriority, DataChangeCallback, CanvasTransform, ReviewStatusCode, ScoreInfo, ConnectorStyle } from '../types';
 import { MindMapNode } from './MindMapNode';
 import { Toolbar } from './Toolbar';
 import { BottomToolbar } from './BottomToolbar';
@@ -12,7 +12,8 @@ import { ShortcutsModal as ShortcutsPanel } from './ShortcutsModal';
 import { ReviewMenu } from './ReviewStatusModal';
 import { RemarkModal } from './RemarkModal';
 import { ScoreModal } from './ScoreModal';
-import { generateCurvePath } from '../utils/generateElbowPath';
+import { generateElbowPath } from '../utils/generateElbowPath';
+import { generateCurvePath } from '../utils/generateCurvePath';
 import { canvasReducer } from '../state/canvasReducer';
 import { getInitialCanvasState } from '../state/canvasState';
 import { countAllDescendants, findAllDescendantUuids, findAllAncestorUuids, hasUseCaseDescendant, isDemandNodeReadyForReview } from '../utils/findAllDescendantIds';
@@ -146,6 +147,7 @@ interface MindMapCanvasProps {
     nodeScoringNodeTypes: NodeType[];
     enableBulkReviewContextMenu: boolean;
     enableSingleReviewContextMenu: boolean;
+    connectorStyle: ConnectorStyle;
 }
 
 const SvgPath = React.memo(({ d, className }: { d: string, className: string }) => {
@@ -163,7 +165,7 @@ const AUTO_PAN_SPEED = 10;
 
 export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
     mindMapData, onAddChildNode, onAddSiblingNode, onDeleteNode, onFinishEditing, onUpdateNodePosition, onReparentNode, onReorderNode, onLayout, onUpdateNodeSize, onSave, showAITag, isDraggable = false, enableStrictDrag = false, enableNodeReorder = true, reorderableNodeTypes, showNodeType, showPriority, onToggleCollapse, onExpandNodes, onExpandAllNodes, onCollapseAllNodes, onExpandToLevel, onCollapseToLevel, onUpdateNodeType, onUpdateNodePriority, onConfirmReviewStatus, onConfirmRemark, onConfirmScore,
-    onUndo, onRedo, canUndo, canRedo, showTopToolbar, showBottomToolbar, topToolbarCommands, bottomToolbarCommands, strictMode = false, showContextMenu = true, showCanvasContextMenu = true, priorityEditableNodeTypes, onDataChange, onExecuteUseCase, enableUseCaseExecution, canvasBackgroundColor, showBackgroundDots, showMinimap, getNodeBackgroundColor, enableReadOnlyUseCaseExecution, enableExpandCollapseByLevel, isReadOnly, onToggleReadOnly, onSetReadOnly, isDirty, children, newlyAddedNodeUuid, onNodeFocused, showReadOnlyToggleButtons, showShortcutsButton, enableReviewStatus, enableNodeRemarks, enableNodeScoring, reviewStatusNodeTypes, nodeRemarksNodeTypes, nodeScoringNodeTypes, enableBulkReviewContextMenu, enableSingleReviewContextMenu
+    onUndo, onRedo, canUndo, canRedo, showTopToolbar, showBottomToolbar, topToolbarCommands, bottomToolbarCommands, strictMode = false, showContextMenu = true, showCanvasContextMenu = true, priorityEditableNodeTypes, onDataChange, onExecuteUseCase, enableUseCaseExecution, canvasBackgroundColor, showBackgroundDots, showMinimap, getNodeBackgroundColor, enableReadOnlyUseCaseExecution, enableExpandCollapseByLevel, isReadOnly, onToggleReadOnly, onSetReadOnly, isDirty, children, newlyAddedNodeUuid, onNodeFocused, showReadOnlyToggleButtons, showShortcutsButton, enableReviewStatus, enableNodeRemarks, enableNodeScoring, reviewStatusNodeTypes, nodeRemarksNodeTypes, nodeScoringNodeTypes, enableBulkReviewContextMenu, enableSingleReviewContextMenu, connectorStyle
 }) => {
     const [canvasState, dispatch] = useReducer(canvasReducer, {
         rootUuid: mindMapData.rootUuid,
@@ -1018,6 +1020,8 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
         return mindMapData.nodes[activePopup.nodeUuid] ?? null;
     }, [activePopup.nodeUuid, mindMapData.nodes]);
 
+    const pathGenerator = connectorStyle === 'curve' ? generateCurvePath : generateElbowPath;
+
 
     return (
         <div 
@@ -1091,7 +1095,7 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
                         }
                         
                         const isDragged = draggedSubtreeUuids.has(node.uuid!);
-                        const d = generateCurvePath(mindMapData.nodes[node.parentUuid!], node);
+                        const d = pathGenerator(mindMapData.nodes[node.parentUuid!], node);
                         const className = `mind-map-canvas__connector ${isDragged ? 'mind-map-canvas__connector--dragging' : ''}`;
                         const dragTransform = isDragged && dragState?.offset ? `translate(${dragState.offset.dx}, ${dragState.offset.dy})` : undefined;
 
@@ -1125,7 +1129,7 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
 
                         return (
                             <SvgPath
-                                d={generateCurvePath(sourceNodeForPreview, targetNodeForPreview as MindMapNodeData)}
+                                d={pathGenerator(sourceNodeForPreview, targetNodeForPreview as MindMapNodeData)}
                                 className="mind-map-canvas__connector mind-map-canvas__connector--preview"
                             />
                         );

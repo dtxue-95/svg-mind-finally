@@ -2,6 +2,7 @@
 
 export type NodeType = 'DEMAND' | 'MODULE' | 'TEST_POINT' | 'USE_CASE' | 'STEP' | 'PRECONDITION' | 'EXPECTED_RESULT' | 'GENERAL';
 export type NodePriority = 'P0' | 'P1' | 'P2' | 'P3' | null;
+export type ConnectorStyle = 'elbow' | 'curve';
 
 export interface CanvasTransform {
     scale: number;

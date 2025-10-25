@@ -174,6 +174,7 @@ function ComprehensiveExample() {
               onConfirmRemark={handleConfirmRemark}
               onConfirmScore={handleConfirmScore}
               showMinimap={true}
+              connectorStyle="curve"
             >
               <Panel position="top-left">
                 <div style={{padding: '10px', background: 'rgba(255,255,255,0.8)', borderRadius: '8px', border: '1px solid #ddd', marginTop: '30px'}}>
@@ -236,6 +237,7 @@ root.render(<ComprehensiveExample />);
 
 | Prop 名称                   | 类型                                     | 描述                                                                                                                                                             | 默认值                                                     |
 | --------------------------- | ---------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
+| `connectorStyle`            | `'elbow' \| 'curve'`                     | 设置节点连接线的样式。`elbow` 为直角折线，`curve` 为平滑贝塞尔曲线。                                                                                               | `'elbow'`                                                  |
 | `showAITag`                 | `boolean`                                | 是否显示 `generateModeName: 'AI'` 节点的 AI 标识。                                                                                                                   | `true`                                                     |
 | `showNodeType`              | `boolean`                                | 是否在节点上显示其类型标签。                                                                                                                                     | `true`                                                     |
 | `showPriority`              | `boolean`                                | 是否在节点上显示其优先级标签。                                                                                                                                   | `true`                                                     |

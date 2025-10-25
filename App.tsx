@@ -1,7 +1,7 @@
 import React, { useImperativeHandle, forwardRef, useCallback, useState, useEffect, useMemo } from 'react';
 import { useMindMap } from './hooks/useMindMap';
 import { MindMapCanvas } from './components/MindMapCanvas';
-import type { RawNode, CommandId, NodeType, DataChangeCallback, DataChangeInfo, MindMapNodeData, ReviewStatusCode, ScoreInfo } from './types';
+import type { RawNode, CommandId, NodeType, DataChangeCallback, DataChangeInfo, MindMapNodeData, ReviewStatusCode, ScoreInfo, ConnectorStyle } from './types';
 import { OperationType } from './types';
 import { createInitialMindMap } from './utils/createInitialMindMap';
 import { convertDataChangeInfo } from './utils/callbackDataConverter';
@@ -10,7 +10,7 @@ import { getNodeChainByUuid } from './utils/dataChangeUtils';
 // Export Panel component and types for external use
 export { Panel } from './components/Panel';
 export type { PanelPosition } from './components/Panel';
-export type { RawNode, CommandId, NodeType, DataChangeCallback, DataChangeInfo, MindMapNodeData };
+export type { RawNode, CommandId, NodeType, DataChangeCallback, DataChangeInfo, MindMapNodeData, ConnectorStyle };
 
 
 const defaultTopCommands: CommandId[] = ['undo', 'redo', 'separator', 'addSibling', 'addChild', 'delete', 'save', 'closeTop'];
@@ -74,6 +74,7 @@ interface AppProps {
     nodeScoringNodeTypes?: NodeType[];
     enableBulkReviewContextMenu?: boolean;
     enableSingleReviewContextMenu?: boolean;
+    connectorStyle?: ConnectorStyle;
     children?: React.ReactNode;
 }
 
@@ -117,6 +118,7 @@ const App = forwardRef<AppRef, AppProps>(({
     nodeScoringNodeTypes = defaultNodeScoringNodeTypes,
     enableBulkReviewContextMenu = true,
     enableSingleReviewContextMenu = true,
+    connectorStyle = 'elbow',
     children,
 }, ref) => {
     // State to hold the data for the mind map. Initialized from props.
@@ -343,6 +345,7 @@ const App = forwardRef<AppRef, AppProps>(({
                 nodeScoringNodeTypes={nodeScoringNodeTypes}
                 enableBulkReviewContextMenu={enableBulkReviewContextMenu}
                 enableSingleReviewContextMenu={enableSingleReviewContextMenu}
+                connectorStyle={connectorStyle}
             >
                 {children}
             </MindMapCanvas>

@@ -23,7 +23,8 @@ export type MindMapAction =
     | { type: 'UPDATE_SINGLE_NODE_REVIEW_STATUS'; payload: { nodeUuid: string; newStatus: ReviewStatusCode } }
     | { type: 'ADD_REMARK'; payload: { nodeUuid: string, remark: Remark } }
     | { type: 'UPDATE_SCORE_INFO'; payload: { nodeUuid: string, scoreInfo: ScoreInfo } }
-    | { type: 'PARTIAL_UPDATE_NODE', payload: { nodeUuid: string, partialData: Partial<MindMapNodeData> } };
+    | { type: 'PARTIAL_UPDATE_NODE', payload: { nodeUuid: string, partialData: Partial<MindMapNodeData> } }
+    | { type: 'SYNC_DATA'; payload: MindMapData };
 
 // Defines the logical hierarchy of node types for level-based operations.
 const typeHierarchy: NodeType[] = ['DEMAND', 'MODULE', 'TEST_POINT', 'USE_CASE', 'PRECONDITION', 'STEP', 'EXPECTED_RESULT'];
@@ -533,6 +534,37 @@ export const mindMapReducer = (state: MindMapData, action: MindMapAction): MindM
                     ...state.nodes,
                     [nodeUuid]: updatedNode,
                 },
+            };
+        }
+
+        case 'SYNC_DATA': {
+            const newMindMapData = action.payload;
+            const currentMindMap = state;
+            
+            const mergedNodes: Record<string, MindMapNodeData> = {};
+
+            for (const uuid in newMindMapData.nodes) {
+                const newNodeData = newMindMapData.nodes[uuid];
+                const oldNodeData = currentMindMap.nodes[uuid];
+
+                if (oldNodeData) {
+                    // Node exists, merge new data with old layout/view state.
+                    mergedNodes[uuid] = {
+                        ...newNodeData, // Take all new structural and content data
+                        position: oldNodeData.position, // Keep old layout data
+                        width: oldNodeData.width,
+                        height: oldNodeData.height,
+                        isCollapsed: oldNodeData.isCollapsed, // Also keep collapse state
+                    };
+                } else {
+                    // New node, just add it. Layout will position it later.
+                    mergedNodes[uuid] = newNodeData;
+                }
+            }
+            
+            return {
+                rootUuid: newMindMapData.rootUuid,
+                nodes: mergedNodes
             };
         }
 

@@ -261,9 +261,13 @@ root.render(<ComprehensiveExample />);
 
 ```typescript
 export interface AppRef {
-  // --- 通用操作 ---
+  // --- 数据操作 ---
   save: () => DataChangeInfo;
   setData: (newData: RawNode) => void;
+  syncData: (newData: RawNode) => void;
+  partialUpdateNodeData: (nodeUuid: string, partialData: Partial<MindMapNodeData>) => void;
+
+  // --- 状态控制 ---
   resetHistory: () => void;
   setReadOnly: (isReadOnly: boolean) => void;
   
@@ -273,7 +277,6 @@ export interface AppRef {
   getReviewStatusUpdateInfo: (nodeUuid: string, newStatus: ReviewStatusCode) => DataChangeInfo | null;
   confirmRemark: (nodeUuid: string, content: string) => void;
   confirmScore: (nodeUuid: string, scoreInfo: ScoreInfo) => void;
-  partialUpdateNodeData: (nodeUuid: string, partialData: Partial<MindMapNodeData>) => void;
 }
 ```
 
@@ -283,8 +286,12 @@ export interface AppRef {
     -   **用途**: 当你需要从外部按钮或其他非思维导图UI触发保存时调用。它**不会**触发 `onSave` 回调。
 
 -   **`setData(newData: RawNode)`**
-    -   **作用**: **完全替换**思维导图中的所有数据。
-    -   **用途**: 在组件挂载后，通过异步 API 获取数据并加载到导图中。调用此方法后，组件会自动重置历史记录并进入只读状态。
+    -   **作用**: **硬重置**。完全替换思维导图中的所有数据，并重置视图（缩放/平移）和历史记录。
+    -   **用途**: 用于首次加载数据或需要完全丢弃当前状态并加载一个全新导图的场景。
+
+-   **`syncData(newData: RawNode)`**
+    -   **作用**: **智能同步**。使用新数据更新导图，但**保留当前的视图（缩放/平移）和现有节点的布局信息**。
+    -   **用途**: **推荐用于保存成功后回显后端数据**。它会平滑地添加、删除或更新节点，而不会让用户的视图跳回初始位置，极大地提升了用户体验。
 
 -   **`resetHistory()`**
     -   **作用**: **清空撤销/重做历史记录**，并将当前状态设为新的“原始”状态。
@@ -297,23 +304,6 @@ export interface AppRef {
 -   **`executeUseCase(nodeUuid: string)`**
     -   **作用**: 触发指定 `uuid` 的用例节点的 `onExecuteUseCase` 回调。
     -   **用途**: 从外部UI（如测试用例列表）触发用例执行。
-
--   **`confirmReviewStatus(nodeUuid: string, newStatus: ReviewStatusCode)`**
-    -   **作用**: 命令式地更新节点的评审状态。这会触发内部状态更新和 `onConfirmReviewStatus` 回调。
-    -   **用途**: 从外部UI（如详情面板）直接修改评审状态。
-
--   **`getReviewStatusUpdateInfo(...): DataChangeInfo | null`**
-    -   **作用**: **预览**更新评审状态将产生的效果，而**不实际应用**它。
-    -   **返回**: 如果操作有效，返回一个完整的 `DataChangeInfo` 对象，你可以检查其中的 `updatedNodes` 来了解哪些节点（包括父节点）的状态会被聚合更新。如果操作无效（如对无用例的模块进行评审），返回 `null`。
-    -   **用途**: 在调用 `confirmReviewStatus` 之前，向用户展示变更范围或进行有效性检查。
-
--   **`confirmRemark(nodeUuid: string, content: string)`**
-    -   **作用**: 命令式地为节点添加一条新备注。
-    -   **用途**: 从外部富文本编辑器或其他UI提交备注。
-
--   **`confirmScore(nodeUuid: string, scoreInfo: ScoreInfo)`**
-    -   **作用**: 命令式地为节点添加或更新评分。
-    -   **用途**: 从外部UI提交评分。
     
 -   **`partialUpdateNodeData(nodeUuid, partialData)`**
     -   **作用**: **局部增量更新**指定节点的数据，而**不会触发界面重绘或创建撤销/重做历史记录**。它会直接合并 `partialData` 到现有节点数据中。
@@ -324,15 +314,12 @@ export interface AppRef {
 
 ## 核心工作流详解
 
-### 1. 数据加载与更新
+### 1. 数据加载与更新 (setData vs syncData)
 
-当你的应用从后端获取数据来更新思维导图时（例如在初始加载、保存后或执行用例后），组件现在可以平滑地处理这些更新，而不会重置用户的视图。
-
-1.  **初始加载**: 遵循标准 React 模式。在父组件中设置 state（例如 `mindMapData`），初始值为 `null`。在 `useEffect` 中获取数据，然后更新 state，并将 `mindMapData` 传递给 `<App>` 的 `initialData` prop。
-
-2.  **数据刷新 (重要)**: 当你需要用来自 API 的新数据刷新思维导图时，推荐使用 `ref.setData(newData)`。
-    -   调用 `ref.current.setData(newData)` 会完全替换导图内容，并自动重置历史记录和只读状态。这是最干净、最可预测的数据更新方式。
-    -   直接更新 `initialData` prop 也会强制组件重新加载，但它更适合作为一种“受控”模式。
+-   **初始加载**: 使用 `initialData` prop 或在 `useEffect` 中获取数据后调用 `ref.current.setData(data)`。两者效果类似，都会进行一次完整的渲染和布局。
+-   **保存后数据同步 (重要)**:
+    -   **旧方式 (不推荐)**: 调用 `ref.current.setData(newData)`。这会**重置视图**，用户的缩放和平移状态会丢失，体验不佳。
+    -   **新方式 (推荐)**: 调用 `ref.current.syncData(newData)`。这会**保留视图**，并智能地更新数据，只对新增或有结构变化的节点重新计算布局，为用户提供无缝的更新体验。
 
 ### 2. 保存与状态管理（重要）
 
@@ -348,17 +335,19 @@ export interface AppRef {
 3.  **处理保存逻辑**: 在你的 `onSave` 函数中：
     -   调用你的后端 API 来保存 `info.currentRawData`。
     -   `await` API 的返回结果。
+    -   **(可选) API 成功后，重新请求一次最新的全量数据**，以确保与后端完全同步。
 
 4.  **处理 API 结果**:
     -   **如果 API 调用成功**:
         -   向用户显示成功提示（如 `alert` 或 `toast`）。
+        -   **(可选) 如果上一步重新请求了数据**，调用 `ref.current.syncData(latestDataFromServer)` 来无缝更新UI。
         -   调用 `ref.current.resetHistory()`。这会清空撤销/重做栈，并将 `isDirty` 状态重置为 `false`，“保存”按钮会再次变为不可用。
         -   调用 `ref.current.setReadOnly(true)`。将思维导图设为只读模式，这是一个好习惯，可以防止用户在确认保存成功前进行新的修改。
     -   **如果 API 调用失败**:
         -   向用户显示错误提示。
-        -   **什么都不做**。不要调用 `resetHistory` 或 `setReadOnly`。这样，思维导图将保持在可编辑状态，`isDirty` 仍为 `true`，“保存”按钮也依然可用，用户可以修正问题或重试保存。
+        -   **什么都不做**。不要调用 `syncData`, `resetHistory` 或 `setReadOnly`。这样，思维导图将保持在可编辑状态，`isDirty` 仍为 `true`，“保存”按钮也依然可用，用户可以修正问题或重试保存。
 
-这个流程确保了组件的状态能够准确反映数据是否已成功持久化。
+这个流程确保了组件的状态能够准确反映数据是否已成功持久化，并提供了最佳的用户体验。
 
 ### 3. 评审、备注与评分工作流
 
@@ -593,6 +582,7 @@ interface RawNode {
 | `LOAD_DATA`                        | 初始数据加载完成                         |
 | `SELECT_NODE`                      | 选中或取消选中了一个节点                 |
 | `SAVE`                             | 触发了保存操作                           |
+| `SYNC_DATA`                        | 智能同步了外部数据（保留视图）           |
 | `EXECUTE_USE_CASE`                 | 触发了用例执行操作                       |
 | `BULK_UPDATE_REVIEW_STATUS`        | 批量更新了评审状态（由父节点发起）       |
 | `UPDATE_SINGLE_NODE_REVIEW_STATUS` | 更新了单个用例的评审状态（并向上聚合）   |

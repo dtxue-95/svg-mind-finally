@@ -170,6 +170,7 @@ export enum OperationType {
   ADD_REMARK = 'ADD_REMARK',
   UPDATE_SCORE_INFO = 'UPDATE_SCORE_INFO',
   PARTIAL_UPDATE_NODE = 'PARTIAL_UPDATE_NODE',
+  SYNC_DATA = 'SYNC_DATA',
 }
 
 // New types for the data sent in the callback, using raw keys

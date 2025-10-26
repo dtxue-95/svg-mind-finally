@@ -774,6 +774,30 @@ export const useMindMap = (
         
         dispatch(action);
     }, [dispatch]);
+    
+    const syncData = useCallback((newMindMapData: MindMapData) => {
+        const currentMindMap = mindMapRef.current;
+        
+        // The reducer merges the new data with existing layout information
+        const intermediateState = mindMapReducer(currentMindMap, { type: 'SYNC_DATA', payload: newMindMapData });
+        
+        // The layout function calculates positions for new nodes while respecting old ones
+        const laidOutMap = autoLayout(intermediateState);
+        
+        if (onDataChangeRef.current) {
+            const info = {
+                operationType: OperationType.SYNC_DATA,
+                timestamp: Date.now(),
+                description: 'Data synchronized with external source, preserving view state.',
+                previousData: currentMindMap,
+                currentData: laidOutMap,
+            };
+            onDataChangeRef.current(convertDataChangeInfo(info));
+        }
+        
+        // Reset history with the new, synchronized, and laid-out state
+        dispatch({ type: 'RESET_HISTORY', payload: laidOutMap });
+    }, [dispatch]);
 
 
     const resetHistory = useCallback(() => {
@@ -805,6 +829,7 @@ export const useMindMap = (
         confirmRemark,
         confirmScore,
         partialUpdateNode,
+        syncData,
         undo,
         redo,
         canUndo,

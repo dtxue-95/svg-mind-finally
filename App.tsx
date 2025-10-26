@@ -26,6 +26,7 @@ export interface AppRef {
   save: () => DataChangeInfo;
   executeUseCase: (nodeUuid: string) => void;
   setData: (newData: RawNode) => void;
+  syncData: (newData: RawNode) => void;
   resetHistory: () => void;
   setReadOnly: (isReadOnly: boolean) => void;
   confirmReviewStatus: (nodeUuid: string, newStatus: ReviewStatusCode) => void;
@@ -164,6 +165,7 @@ const App = forwardRef<AppRef, AppProps>(({
         confirmRemark,
         confirmScore,
         partialUpdateNode,
+        syncData,
         undo,
         redo,
         canUndo,
@@ -247,6 +249,10 @@ const App = forwardRef<AppRef, AppProps>(({
             resetHistory();
             setIsReadOnly(true);
         },
+        syncData: (newData: RawNode) => {
+            const newMindMap = createInitialMindMap(newData);
+            syncData(newMindMap);
+        },
         resetHistory: () => {
             resetHistory();
         },
@@ -268,7 +274,7 @@ const App = forwardRef<AppRef, AppProps>(({
         partialUpdateNodeData: (nodeUuid: string, partialData: Partial<MindMapNodeData>) => {
             partialUpdateNode(nodeUuid, partialData);
         },
-    }), [constructSavePayload, enableUseCaseExecution, handleExecuteUseCase, resetHistory, confirmReviewStatus, getReviewStatusUpdateInfo, confirmRemark, confirmScore, partialUpdateNode]);
+    }), [constructSavePayload, enableUseCaseExecution, handleExecuteUseCase, resetHistory, confirmReviewStatus, getReviewStatusUpdateInfo, confirmRemark, confirmScore, partialUpdateNode, syncData]);
 
     const handleSaveRequest = () => {
         if (onSave) {

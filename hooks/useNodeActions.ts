@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, Dispatch } from 'react';
 import type { MindMapData, MindMapNodeData, NodeType, DataChangeCallback } from '../types';
 import { NODE_TYPE_PROPS, MIN_NODE_HEIGHT, MIN_NODE_WIDTH } from '../constants';
 import { findAllDescendantUuids } from '../utils/findAllDescendantIds';
@@ -8,7 +8,7 @@ import { mindMapReducer } from '../state/mindMapReducer';
 import { OperationType } from '../types';
 import { convertDataChangeInfo } from '../utils/callbackDataConverter';
 
-type DispatchFunction = React.Dispatch<MindMapAction | { type: 'UNDO' } | { type: 'REDO' }>;
+type DispatchFunction = Dispatch<MindMapAction | { type: 'UNDO' } | { type: 'REDO' }>;
 type PerformLayoutFunction = (map: MindMapData) => MindMapData;
 
 export const useNodeActions = (

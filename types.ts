@@ -1,5 +1,3 @@
-
-
 export type NodeType = 'DEMAND' | 'MODULE' | 'TEST_POINT' | 'USE_CASE' | 'STEP' | 'PRECONDITION' | 'EXPECTED_RESULT' | 'GENERAL';
 export type NodePriority = 'P0' | 'P1' | 'P2' | 'P3' | null;
 export type ConnectorStyle = 'elbow' | 'curve';
@@ -165,6 +163,7 @@ export enum OperationType {
   SELECT_NODE = 'SELECT_NODE',
   SAVE = 'SAVE',
   EXECUTE_USE_CASE = 'EXECUTE_USE_CASE',
+  SUBMIT_DEFECT = 'SUBMIT_DEFECT',
   BULK_UPDATE_REVIEW_STATUS = 'BULK_UPDATE_REVIEW_STATUS',
   UPDATE_SINGLE_NODE_REVIEW_STATUS = 'UPDATE_SINGLE_NODE_REVIEW_STATUS',
   ADD_REMARK = 'ADD_REMARK',

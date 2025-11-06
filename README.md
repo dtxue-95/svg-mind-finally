@@ -17,6 +17,9 @@
     - **一键评审**: 支持在父节点上批量更新所有后代用例的评审状态。
     - **节点备注**: 允许用户为节点添加多条带时间戳和用户信息的备注。
     - **节点评分**: 支持对节点进行五星评分并附带评语。
+- **测试与开发集成**:
+    - **执行用例**: 支持从用例节点触发执行操作，并通过 `onExecuteUseCase` 回调与外部测试系统集成。
+    - **提交缺陷**: 支持从任意节点触发缺陷提交，通过 `onSubmitDefect` 回调获取节点上下文信息，与缺陷管理系统（如 Jira）集成。
 - **视图控制**:
     - **缩放与平移**: 支持鼠标滚輪缩放和画布拖拽平移。
     - **视图命令**: 一键适应视图、视图居中、全屏模式。
@@ -206,6 +209,7 @@ root.render(<ComprehensiveExample />);
 | `onDataChange`          | `(info: DataChangeInfo) => void`         | **核心回调**。当导图数据发生任何变更时触发。                                                                                                                                                                                                                        | `(info) => console.log(...)` |
 | `onSave`                | `(info: DataChangeInfo) => void`         | 当用户点击工具栏中的“保存”按钮时触发的回调函数。**这是实现保存逻辑的主要入口。**                                                                                                                                                                                      | `(info) => console.log(...)` |
 | `onExecuteUseCase`      | `(info: DataChangeInfo) => void`         | 当用户通过上下文菜单或 API 执行用例时触发的回调函数。                                                                                                                                                                                                                 | `(info) => console.log(...)` |
+| `onSubmitDefect`        | `(info: DataChangeInfo) => void`         | 当用户通过上下文菜单或 API 提交缺陷时触发的回调函数。                                                                                                                                                                                                                 | `(info) => console.log(...)` |
 | `onConfirmReviewStatus` | `(info: DataChangeInfo) => void`         | 当用户在评审弹窗中点击“确定”后触发。`info` 对象包含了此次变更的完整上下文。                                                                                                                                                                                           | `(info) => console.log(...)` |
 | `onConfirmRemark`       | `(info: DataChangeInfo) => void`         | 当用户在备注弹窗中添加新备注后触发。                                                                                                                                                                                                                                  | `(info) => console.log(...)` |
 | `onConfirmScore`        | `(info: DataChangeInfo) => void`         | 当用户在评分弹窗中提交评分后触发。                                                                                                                                                                                                                                    | `(info) => console.log(...)` |
@@ -220,6 +224,7 @@ root.render(<ComprehensiveExample />);
 | `enableNodeReorder`               | `boolean`                                | 是否允许通过拖拽来对同级节点进行排序。                                                                                                                           | `true`                                                   |
 | `reorderableNodeTypes`            | `NodeType[]`                             | 定义了哪些节点类型可以被拖拽挂载和排序。                                                                                                                         | `['MODULE', 'TEST_POINT', 'USE_CASE', 'STEP']`           |
 | `enableUseCaseExecution`          | `boolean`                                | 是否启用“执行用例”功能。                                                                                                                                         | `true`                                                   |
+| `enableDefectSubmission`          | `boolean`                                | 是否启用“提交缺陷”功能。                                                                                                                                         | `true`                                                   |
 | `enableReadOnlyUseCaseExecution`  | `boolean`                                | 在只读模式下，是否允许通过右键菜单执行用例。                                                                                                                     | `true`                                                   |
 | `enableExpandCollapseByLevel`     | `boolean`                                | 是否在画布右键菜单中启用“按节点类型展开/收起”的功能。                                                                                                            | `true`                                                   |
 | `enableReviewStatus`              | `boolean`                                | 是否为指定类型的节点启用评审状态图标（待评审、通过、拒绝）。                                                                                                     | `true`                                                   |
@@ -273,6 +278,7 @@ export interface AppRef {
   
   // --- 用例与评审 ---
   executeUseCase: (nodeUuid: string) => void;
+  submitDefect: (nodeUuid: string) => void;
   confirmReviewStatus: (nodeUuid: string, newStatus: ReviewStatusCode) => void;
   getReviewStatusUpdateInfo: (nodeUuid: string, newStatus: ReviewStatusCode) => DataChangeInfo | null;
   confirmRemark: (nodeUuid: string, content: string) => void;
@@ -304,6 +310,10 @@ export interface AppRef {
 -   **`executeUseCase(nodeUuid: string)`**
     -   **作用**: 触发指定 `uuid` 的用例节点的 `onExecuteUseCase` 回调。
     -   **用途**: 从外部UI（如测试用例列表）触发用例执行。
+    
+-   **`submitDefect(nodeUuid: string)`**
+    -   **作用**: 触发指定 `uuid` 节点的 `onSubmitDefect` 回调。
+    -   **用途**: 从外部UI触发缺陷提交。
     
 -   **`partialUpdateNodeData(nodeUuid, partialData)`**
     -   **作用**: **局部增量更新**指定节点的数据，而**不会触发界面重绘或创建撤销/重做历史记录**。它会直接合并 `partialData` 到现有节点数据中。
@@ -584,6 +594,7 @@ interface RawNode {
 | `SAVE`                             | 触发了保存操作                           |
 | `SYNC_DATA`                        | 智能同步了外部数据（保留视图）           |
 | `EXECUTE_USE_CASE`                 | 触发了用例执行操作                       |
+| `SUBMIT_DEFECT`                    | 触发了缺陷提交操作                       |
 | `BULK_UPDATE_REVIEW_STATUS`        | 批量更新了评审状态（由父节点发起）       |
 | `UPDATE_SINGLE_NODE_REVIEW_STATUS` | 更新了单个用例的评审状态（并向上聚合）   |
 | `ADD_REMARK`                       | 添加了备注                               |

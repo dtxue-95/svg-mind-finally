@@ -1,6 +1,6 @@
 import React, { useRef } from 'react';
 import {
-    FiPlus, FiTrash2, FiMaximize, FiMinimize, FiChevronsRight, FiEdit, FiPlay, FiCheckCircle, FiCheckSquare,
+    FiPlus, FiTrash2, FiMaximize, FiMinimize, FiChevronsRight, FiEdit, FiPlay, FiCheckCircle, FiCheckSquare, FiAlertCircle,
 } from 'react-icons/fi';
 import { FaSitemap } from 'react-icons/fa6';
 import type { MindMapNodeData, NodeType, NodePriority } from '../types';
@@ -24,7 +24,9 @@ interface ContextMenuProps {
     strictMode: boolean;
     priorityEditableNodeTypes: NodeType[];
     onExecuteUseCase?: (nodeUuid: string) => void;
+    onSubmitDefect: (nodeUuid: string) => void;
     enableUseCaseExecution?: boolean;
+    enableDefectSubmission: boolean;
     isReadOnlyContext?: boolean;
     onOpenReviewContextMenu: (nodeUuid: string, event: React.MouseEvent) => void;
     enableBulkReviewContextMenu: boolean;
@@ -32,7 +34,7 @@ interface ContextMenuProps {
 }
 
 export const ContextMenu: React.FC<ContextMenuProps> = ({
-    x, y, node, onClose, onAddChildNode, onAddSiblingNode, onDeleteNode, onToggleCollapse, onUpdateNodeType, onUpdateNodePriority, isRoot, isReadOnly, strictMode, priorityEditableNodeTypes, onExecuteUseCase, enableUseCaseExecution, isReadOnlyContext, onOpenReviewContextMenu, enableBulkReviewContextMenu, enableSingleReviewContextMenu
+    x, y, node, onClose, onAddChildNode, onAddSiblingNode, onDeleteNode, onToggleCollapse, onUpdateNodeType, onUpdateNodePriority, isRoot, isReadOnly, strictMode, priorityEditableNodeTypes, onExecuteUseCase, onSubmitDefect, enableUseCaseExecution, enableDefectSubmission, isReadOnlyContext, onOpenReviewContextMenu, enableBulkReviewContextMenu, enableSingleReviewContextMenu
 }) => {
     const menuRef = useRef<HTMLDivElement>(null);
     const style = usePopoverPositioning(menuRef, x, y);
@@ -47,6 +49,7 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
     const handleUpdateNodeType = (type: NodeType) => { onUpdateNodeType(node.uuid!, type); onClose(); };
     const handleUpdatePriority = (priorityLevel: NodePriority) => { onUpdateNodePriority(node.uuid!, priorityLevel); onClose(); };
     const handleExecute = () => { if(onExecuteUseCase) { onExecuteUseCase(node.uuid!); onClose(); } };
+    const handleSubmitDefect = () => { onSubmitDefect(node.uuid!); onClose(); };
     const handleOpenReview = (e: React.MouseEvent) => {
         if (node.uuid) {
             onOpenReviewContextMenu(node.uuid, e);
@@ -62,6 +65,11 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
         const canBulkReview = enableBulkReviewContextMenu && isParentForReview;
         const canSingleReview = enableSingleReviewContextMenu && isUseCase;
 
+        const showSubmitDefect = enableDefectSubmission;
+        const submitDefectDisabled = isRoot;
+
+        const hasAnyPreviousActions = canExecute || canBulkReview || canSingleReview;
+
         return (
             <div ref={menuRef} className="context-menu" style={style} onContextMenu={(e) => e.preventDefault()}>
                 <ul>
@@ -69,6 +77,12 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
                     {canSingleReview && <ContextMenuItem onClick={handleOpenReview}><FiCheckSquare /> 评审用例</ContextMenuItem>}
                     {canExecute && (canBulkReview || canSingleReview) && <ContextMenuItem isSeparator />}
                     {canExecute && <ContextMenuItem onClick={handleExecute}><FiPlay /> 执行用例</ContextMenuItem>}
+                    {showSubmitDefect && hasAnyPreviousActions && <ContextMenuItem isSeparator />}
+                    {showSubmitDefect && (
+                        <ContextMenuItem onClick={handleSubmitDefect} disabled={submitDefectDisabled}>
+                            <FiAlertCircle /> 提交缺陷
+                        </ContextMenuItem>
+                    )}
                 </ul>
             </div>
         );
@@ -79,6 +93,7 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
     const deleteDisabled = isRoot || isReadOnly;
     const toggleCollapseDisabled = !node.childNodeList || node.childNodeList.length === 0;
     const executeUseCaseDisabled = isReadOnly || !enableUseCaseExecution || !node.id;
+    const submitDefectDisabled = isReadOnly || isRoot;
 
     let addChildDisabled = isReadOnly;
     if (strictMode) {
@@ -94,8 +109,9 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
     const showBulkReview = enableBulkReviewContextMenu && isParentNode;
     const showSingleReview = enableSingleReviewContextMenu && isUseCaseNode;
     const showExecuteUseCase = enableUseCaseExecution && isUseCaseNode;
+    const showSubmitDefect = enableDefectSubmission;
 
-    const hasActionBlock = showBulkReview || showSingleReview || showExecuteUseCase;
+    const hasActionBlock = showBulkReview || showSingleReview || showExecuteUseCase || showSubmitDefect;
 
     // --- Submenu Logic ---
     const isGeneralNode = node.nodeType === 'GENERAL';
@@ -182,6 +198,12 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
                 {showExecuteUseCase && (
                     <ContextMenuItem onClick={handleExecute} disabled={executeUseCaseDisabled}>
                         <FiPlay /> 执行用例
+                    </ContextMenuItem>
+                )}
+                
+                {showSubmitDefect && (
+                    <ContextMenuItem onClick={handleSubmitDefect} disabled={submitDefectDisabled}>
+                        <FiAlertCircle /> 提交缺陷
                     </ContextMenuItem>
                 )}
                 

@@ -25,6 +25,7 @@ const defaultNodeScoringNodeTypes: NodeType[] = ['MODULE', 'TEST_POINT', 'USE_CA
 export interface AppRef {
   save: () => DataChangeInfo;
   executeUseCase: (nodeUuid: string) => void;
+  submitDefect: (nodeUuid: string) => void;
   setData: (newData: RawNode) => void;
   syncData: (newData: RawNode) => void;
   resetHistory: () => void;
@@ -56,7 +57,9 @@ interface AppProps {
     onDataChange?: DataChangeCallback;
     onSave?: (info: DataChangeInfo) => void;
     enableUseCaseExecution?: boolean;
+    enableDefectSubmission?: boolean;
     onExecuteUseCase?: (info: DataChangeInfo) => void;
+    onSubmitDefect?: (info: DataChangeInfo) => void;
     onConfirmReviewStatus?: (info: DataChangeInfo) => void;
     onConfirmRemark?: (info: DataChangeInfo) => void;
     onConfirmScore?: (info: DataChangeInfo) => void;
@@ -100,7 +103,9 @@ const App = forwardRef<AppRef, AppProps>(({
     onDataChange = (info) => { console.log('Mind Map Data Changed:', info); },
     onSave = (info) => { console.log('Mind Map Data Save:', info); },
     enableUseCaseExecution = true,
+    enableDefectSubmission = true,
     onExecuteUseCase = (info) => { console.log('Use Case Executed:', info); },
+    onSubmitDefect = (info) => { console.log('Defect Submitted:', info); },
     onConfirmReviewStatus = (info) => { console.log('Review status confirmed:', info); },
     onConfirmRemark = (info) => { console.log('Remark confirmed:', info); },
     onConfirmScore = (info) => { console.log('Score confirmed:', info); },
@@ -231,6 +236,33 @@ const App = forwardRef<AppRef, AppProps>(({
         onExecuteUseCase(convertDataChangeInfo(info));
     }, [mindMap, onExecuteUseCase]);
 
+    const handleSubmitDefect = useCallback((nodeUuid: string) => {
+        if (!onSubmitDefect) return;
+
+        const node = mindMap.nodes[nodeUuid];
+        if (!node) return;
+        
+        const parentNode = node.parentUuid ? mindMap.nodes[node.parentUuid] : undefined;
+        const chain = getNodeChainByUuid(mindMap, nodeUuid);
+
+        const info: any = {
+            operationType: OperationType.SUBMIT_DEFECT,
+            timestamp: Date.now(),
+            description: `Triggered defect submission for node '${node.name}'`,
+            previousData: mindMap,
+            currentData: mindMap,
+            affectedNodeUuids: [nodeUuid],
+            currentNode: node,
+            parentNode,
+            uuidChain: chain.uuids,
+            uuidChainNodes: chain.nodes,
+            parentUuidChain: chain.uuids.slice(0, -1),
+            parentUuidChainNodes: chain.nodes.slice(0, -1),
+        };
+
+        onSubmitDefect(convertDataChangeInfo(info));
+    }, [mindMap, onSubmitDefect]);
+
     useImperativeHandle(ref, () => ({
         save: () => {
             const saveData = constructSavePayload();
@@ -241,6 +273,13 @@ const App = forwardRef<AppRef, AppProps>(({
                 handleExecuteUseCase(nodeUuid);
             } else {
                 console.warn('Use case execution is disabled via API props.');
+            }
+        },
+        submitDefect: (nodeUuid: string) => {
+            if (enableDefectSubmission) {
+                handleSubmitDefect(nodeUuid);
+            } else {
+                console.warn('Defect submission is disabled via API props.');
             }
         },
         setData: (newData: RawNode) => {
@@ -274,7 +313,7 @@ const App = forwardRef<AppRef, AppProps>(({
         partialUpdateNodeData: (nodeUuid: string, partialData: Partial<MindMapNodeData>) => {
             partialUpdateNode(nodeUuid, partialData);
         },
-    }), [constructSavePayload, enableUseCaseExecution, handleExecuteUseCase, resetHistory, confirmReviewStatus, getReviewStatusUpdateInfo, confirmRemark, confirmScore, partialUpdateNode, syncData]);
+    }), [constructSavePayload, enableUseCaseExecution, handleExecuteUseCase, handleSubmitDefect, enableDefectSubmission, resetHistory, confirmReviewStatus, getReviewStatusUpdateInfo, confirmRemark, confirmScore, partialUpdateNode, syncData]);
 
     const handleSaveRequest = () => {
         if (onSave) {
@@ -334,7 +373,9 @@ const App = forwardRef<AppRef, AppProps>(({
                 priorityEditableNodeTypes={priorityEditableNodeTypes}
                 onDataChange={onDataChange}
                 onExecuteUseCase={handleExecuteUseCase}
+                onSubmitDefect={handleSubmitDefect}
                 enableUseCaseExecution={enableUseCaseExecution}
+                enableDefectSubmission={enableDefectSubmission}
                 canvasBackgroundColor={canvasBackgroundColor}
                 showBackgroundDots={showBackgroundDots}
                 showMinimap={showMinimap}

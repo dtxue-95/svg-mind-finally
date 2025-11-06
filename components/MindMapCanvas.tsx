@@ -101,6 +101,7 @@ interface MindMapCanvasProps {
     onConfirmReviewStatus: (nodeUuid: string, newStatus: ReviewStatusCode) => void;
     onConfirmRemark: (nodeUuid: string, content: string) => void;
     onConfirmScore: (nodeUuid: string, scoreInfo: ScoreInfo) => void;
+    onSubmitDefect: (nodeUuid: string) => void;
     onSave: () => void;
     showAITag: boolean;
     isDraggable?: boolean;
@@ -124,6 +125,7 @@ interface MindMapCanvasProps {
     onDataChange?: DataChangeCallback;
     onExecuteUseCase?: (nodeUuid: string) => void;
     enableUseCaseExecution?: boolean;
+    enableDefectSubmission: boolean;
     canvasBackgroundColor?: string;
     showBackgroundDots?: boolean;
     showMinimap?: boolean;
@@ -164,8 +166,8 @@ const PAN_AMOUNT = 50;
 const AUTO_PAN_SPEED = 10;
 
 export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
-    mindMapData, onAddChildNode, onAddSiblingNode, onDeleteNode, onFinishEditing, onUpdateNodePosition, onReparentNode, onReorderNode, onLayout, onUpdateNodeSize, onSave, showAITag, isDraggable = false, enableStrictDrag = false, enableNodeReorder = true, reorderableNodeTypes, showNodeType, showPriority, onToggleCollapse, onExpandNodes, onExpandAllNodes, onCollapseAllNodes, onExpandToLevel, onCollapseToLevel, onUpdateNodeType, onUpdateNodePriority, onConfirmReviewStatus, onConfirmRemark, onConfirmScore,
-    onUndo, onRedo, canUndo, canRedo, showTopToolbar, showBottomToolbar, topToolbarCommands, bottomToolbarCommands, strictMode = false, showContextMenu = true, showCanvasContextMenu = true, priorityEditableNodeTypes, onDataChange, onExecuteUseCase, enableUseCaseExecution, canvasBackgroundColor, showBackgroundDots, showMinimap, getNodeBackgroundColor, enableReadOnlyUseCaseExecution, enableExpandCollapseByLevel, isReadOnly, onToggleReadOnly, onSetReadOnly, isDirty, children, newlyAddedNodeUuid, onNodeFocused, showReadOnlyToggleButtons, showShortcutsButton, enableReviewStatus, enableNodeRemarks, enableNodeScoring, reviewStatusNodeTypes, nodeRemarksNodeTypes, nodeScoringNodeTypes, enableBulkReviewContextMenu, enableSingleReviewContextMenu, connectorStyle
+    mindMapData, onAddChildNode, onAddSiblingNode, onDeleteNode, onFinishEditing, onUpdateNodePosition, onReparentNode, onReorderNode, onLayout, onUpdateNodeSize, onSave, showAITag, isDraggable = false, enableStrictDrag = false, enableNodeReorder = true, reorderableNodeTypes, showNodeType, showPriority, onToggleCollapse, onExpandNodes, onExpandAllNodes, onCollapseAllNodes, onExpandToLevel, onCollapseToLevel, onUpdateNodeType, onUpdateNodePriority, onConfirmReviewStatus, onConfirmRemark, onConfirmScore, onSubmitDefect,
+    onUndo, onRedo, canUndo, canRedo, showTopToolbar, showBottomToolbar, topToolbarCommands, bottomToolbarCommands, strictMode = false, showContextMenu = true, showCanvasContextMenu = true, priorityEditableNodeTypes, onDataChange, onExecuteUseCase, enableUseCaseExecution, enableDefectSubmission, canvasBackgroundColor, showBackgroundDots, showMinimap, getNodeBackgroundColor, enableReadOnlyUseCaseExecution, enableExpandCollapseByLevel, isReadOnly, onToggleReadOnly, onSetReadOnly, isDirty, children, newlyAddedNodeUuid, onNodeFocused, showReadOnlyToggleButtons, showShortcutsButton, enableReviewStatus, enableNodeRemarks, enableNodeScoring, reviewStatusNodeTypes, nodeRemarksNodeTypes, nodeScoringNodeTypes, enableBulkReviewContextMenu, enableSingleReviewContextMenu, connectorStyle
 }) => {
     const [canvasState, dispatch] = useReducer(canvasReducer, {
         rootUuid: mindMapData.rootUuid,
@@ -326,8 +328,9 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
             
             // Expand ancestors if they are collapsed to make the new node visible
             const ancestors = findAllAncestorUuids(mindMapData, newlyAddedNodeUuid);
+            // FIX: Add explicit type for `node` to resolve 'property does not exist on type 'unknown'' error.
             const ancestorsToExpand = ancestors.filter(ancestorUuid => {
-                const node = mindMapData.nodes[ancestorUuid];
+                const node: MindMapNodeData | undefined = mindMapData.nodes[ancestorUuid];
                 return node && node.isCollapsed;
             });
 
@@ -976,7 +979,8 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
     
     const handleNodeContextMenu = useCallback((nodeUuid: string, e: React.MouseEvent) => {
         if (!showContextMenu) return;
-        const node = mindMapData.nodes[nodeUuid];
+        // FIX: Add explicit type for `node` to resolve property access errors.
+        const node: MindMapNodeData | undefined = mindMapData.nodes[nodeUuid];
         if (!node) return;
     
         if (isReadOnly) {
@@ -988,7 +992,7 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
             const canSingleReview = enableSingleReviewContextMenu && isUseCase;
             
             // If any read-only action is possible, show the context menu.
-            if (canExecute || canBulkReview || canSingleReview) {
+            if (canExecute || canBulkReview || canSingleReview || enableDefectSubmission) {
                 dispatch({ type: 'SELECT_NODE', payload: { nodeUuid } });
                 dispatch({ type: 'SHOW_CONTEXT_MENU', payload: { nodeUuid, x: e.clientX, y: e.clientY, isReadOnlyContext: true } });
             }
@@ -998,17 +1002,19 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
         // Edit mode logic
         dispatch({ type: 'SELECT_NODE', payload: { nodeUuid } });
         dispatch({ type: 'SHOW_CONTEXT_MENU', payload: { nodeUuid, x: e.clientX, y: e.clientY, isReadOnlyContext: false } });
-    }, [showContextMenu, isReadOnly, mindMapData.nodes, enableReadOnlyUseCaseExecution, enableBulkReviewContextMenu, enableSingleReviewContextMenu, dispatch]);
+    }, [showContextMenu, isReadOnly, mindMapData.nodes, enableReadOnlyUseCaseExecution, enableBulkReviewContextMenu, enableSingleReviewContextMenu, enableDefectSubmission, dispatch]);
 
     const selectedNode: MindMapNodeData | null = selectedNodeUuid ? mindMapData.nodes[selectedNodeUuid] : null;
     const contextMenuNode = contextMenu.nodeUuid ? mindMapData.nodes[contextMenu.nodeUuid] : null;
     
     const isExpandAllDisabled = useMemo(() => {
-        return !Object.values(mindMapData.nodes).some(n => n.isCollapsed);
+        // FIX: Add explicit type for `n` to resolve 'unknown' type error.
+        return !Object.values(mindMapData.nodes).some((n: MindMapNodeData) => n.isCollapsed);
     }, [mindMapData.nodes]);
 
     const isCollapseAllDisabled = useMemo(() => {
-        return !Object.values(mindMapData.nodes).some(n => n.parentUuid && !n.isCollapsed);
+        // FIX: Add explicit type for `n` to resolve 'unknown' type error.
+        return !Object.values(mindMapData.nodes).some((n: MindMapNodeData) => n.parentUuid && !n.isCollapsed);
     }, [mindMapData.nodes]);
 
     const handleMinimapTransformChange = useCallback((newTransform: Partial<CanvasTransform>) => {
@@ -1150,8 +1156,10 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
                     })()}
                     
                     {Object.values(mindMapData.nodes)
-                        .filter(node => visibleNodeUuids.has(node.uuid!))
-                        .map((node) => {
+                        // FIX: Add explicit type for `node` to resolve property access on `unknown`.
+                        .filter((node: MindMapNodeData) => visibleNodeUuids.has(node.uuid!))
+                        // FIX: Add explicit type for `node` to fix multiple 'property does not exist on type 'unknown'' errors.
+                        .map((node: MindMapNodeData) => {
                         const isSearchMatch = isSearchActive && searchMatches.includes(node.uuid!);
                         const isCurrentMatch = isSearchMatch && currentMatchIndex !== null && searchMatches[currentMatchIndex] === node.uuid;
                         const descendantCount = node.isCollapsed ? countAllDescendants(mindMapData, node.uuid!) : 0;
@@ -1274,7 +1282,9 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
                     strictMode={strictMode}
                     priorityEditableNodeTypes={priorityEditableNodeTypes}
                     onExecuteUseCase={onExecuteUseCase}
+                    onSubmitDefect={onSubmitDefect}
                     enableUseCaseExecution={enableUseCaseExecution}
+                    enableDefectSubmission={enableDefectSubmission}
                     isReadOnlyContext={contextMenu.isReadOnlyContext}
                     onOpenReviewContextMenu={handleOpenReviewContextMenu}
                     enableBulkReviewContextMenu={enableBulkReviewContextMenu}

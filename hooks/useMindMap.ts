@@ -111,7 +111,8 @@ export const useMindMap = (
         if (nodes.length === 0) return;
 
         // Check if all nodes have a width defined. This signifies the end of the initial measurement pass.
-        const allNodesMeasured = !nodes.some(n => typeof n.width === 'undefined');
+        // FIX: Add explicit type for `n` to resolve error 'Property 'width' does not exist on type 'unknown''.
+        const allNodesMeasured = !nodes.some((n: MindMapNodeData) => typeof n.width === 'undefined');
 
         if (allNodesMeasured) {
             const laidOutMap = autoLayout(mindMap);
@@ -329,7 +330,8 @@ export const useMindMap = (
 
         if (onDataChange) {
              const changedNodes = Object.values(laidOutMap.nodes).filter(
-                (node, i) => node.isCollapsed !== Object.values(mindMap.nodes)[i].isCollapsed
+                // FIX: Add explicit type for `node` and cast for `Object.values(...)[i]` to resolve 'unknown' type error.
+                (node: MindMapNodeData, i) => node.isCollapsed !== (Object.values(mindMap.nodes)[i] as MindMapNodeData).isCollapsed
             );
             const info = {
                 operationType: OperationType.TOGGLE_NODE_COLLAPSE,
@@ -352,7 +354,8 @@ export const useMindMap = (
 
         if (onDataChange) {
             const changedNodes = Object.values(laidOutMap.nodes).filter(
-                (node, i) => node.isCollapsed !== Object.values(mindMap.nodes)[i].isCollapsed
+                // FIX: Add explicit type for `node` and cast for `Object.values(...)[i]` to resolve 'unknown' type error.
+                (node: MindMapNodeData, i) => node.isCollapsed !== (Object.values(mindMap.nodes)[i] as MindMapNodeData).isCollapsed
             );
             const info = {
                 operationType: OperationType.TOGGLE_NODE_COLLAPSE,

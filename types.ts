@@ -1,3 +1,4 @@
+
 export type NodeType = 'DEMAND' | 'MODULE' | 'TEST_POINT' | 'USE_CASE' | 'STEP' | 'PRECONDITION' | 'EXPECTED_RESULT' | 'GENERAL';
 export type NodePriority = 'P0' | 'P1' | 'P2' | 'P3' | null;
 export type ConnectorStyle = 'elbow' | 'curve';
@@ -156,6 +157,7 @@ export enum OperationType {
   MOVE_NODE = 'MOVE_NODE',
   REORDER_NODE = 'REORDER_NODE',
   TOGGLE_NODE_COLLAPSE = 'TOGGLE_NODE_COLLAPSE',
+  EXPAND_NODES = 'EXPAND_NODES',
   LAYOUT = 'LAYOUT',
   UNDO = 'UNDO',
   REDO = 'REDO',
@@ -242,3 +244,8 @@ export interface DataChangeInfo {
 }
 
 export type DataChangeCallback = (changeInfo: DataChangeInfo) => void;
+
+export interface ValidationConfig {
+    requirePriority?: boolean;
+    requirePrecondition?: boolean;
+}

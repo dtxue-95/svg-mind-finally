@@ -8,7 +8,7 @@ interface MindMapNodeProps {
     isSelected: boolean;
     isBeingDragged: boolean;
     onSelect: (nodeUuid: string) => void;
-    onFinishEditing: (nodeUuid: string, name: string, size: { width: number, height: number }, initialSize: { width: number, height: number }) => void;
+    onFinishEditing: (nodeUuid: string, name: string, size: { width: number, height: number }, initialSize: { width: number, height: number }, isInitialEdit?: boolean) => void;
     onDragStart: (nodeUuid: string, event: React.MouseEvent) => void;
     onReadOnlyPanStart: (event: React.MouseEvent) => void;
     onUpdateSize: (nodeUuid: string, size: { width: number, height: number }, options?: { layout: boolean }) => void;
@@ -62,6 +62,7 @@ const MindMapNodeComponent: React.FC<MindMapNodeProps> = ({
     const contentRef = useRef<HTMLDivElement>(null);
     const isInitialMount = useRef(true);
     const editingStartState = useRef<{name: string, width: number, height: number} | null>(null);
+    const isInitialEditRef = useRef(false);
 
     useEffect(() => {
         setName(node.name ?? '');
@@ -157,6 +158,7 @@ const MindMapNodeComponent: React.FC<MindMapNodeProps> = ({
     // Effect for auto-editing newly added nodes
     useEffect(() => {
         if (isNewlyAdded && !isReadOnly) {
+            isInitialEditRef.current = true; // Mark as initial edit
             editingStartState.current = { name: node.name ?? '', width: node.width!, height: node.height! };
             setIsEditing(true);
             onNodeFocused(); // Notify parent that the node has been "focused"
@@ -198,8 +200,9 @@ const MindMapNodeComponent: React.FC<MindMapNodeProps> = ({
             const sizeChanged = startState.width !== finalSize.width || startState.height !== finalSize.height;
 
             if (textChanged || sizeChanged) {
-                 onFinishEditing(node.uuid, newName, finalSize, { width: startState.width, height: startState.height });
+                 onFinishEditing(node.uuid, newName, finalSize, { width: startState.width, height: startState.height }, isInitialEditRef.current);
             }
+            isInitialEditRef.current = false; // Reset initial edit flag
         }
     }, [isEditing, node, name, onFinishEditing]);
 
@@ -213,6 +216,7 @@ const MindMapNodeComponent: React.FC<MindMapNodeProps> = ({
             e.preventDefault();
             setName(node.name ?? ''); // Revert changes
             setIsEditing(false);
+            isInitialEditRef.current = false; // Cancelled edit, so no special handling needed next time
         }
     };
     

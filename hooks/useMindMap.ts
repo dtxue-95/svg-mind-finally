@@ -175,7 +175,8 @@ export const useMindMap = (
         nodeUuid: string, 
         name: string, 
         size: { width: number; height: number; },
-        initialSize: { width: number; height: number; }
+        initialSize: { width: number; height: number; },
+        isInitialEdit: boolean = false
     ) => {
         const currentMindMap = mindMapRef.current;
         const node = currentMindMap.nodes[nodeUuid];
@@ -228,8 +229,15 @@ export const useMindMap = (
             onDataChangeRef.current(convertDataChangeInfo(info));
         }
         
-        // This special action manually sets the 'past' and 'present' states.
-        dispatch({ type: 'COMMIT_EDIT', payload: { stateToArchive: stateBeforeEdit, newPresentState: laidOutMap } });
+        if (isInitialEdit) {
+            // If this is the first edit after creating the node, we don't want to create a separate undo step for the edit.
+            // We update the 'present' state directly. The 'past' state still points to the moment BEFORE the node was added.
+            // So one Undo will remove the node entirely.
+            dispatch({ type: 'UPDATE_PRESENT_STATE', payload: laidOutMap });
+        } else {
+            // This special action manually sets the 'past' and 'present' states.
+            dispatch({ type: 'COMMIT_EDIT', payload: { stateToArchive: stateBeforeEdit, newPresentState: laidOutMap } });
+        }
     }, [dispatch]);
 
 
@@ -778,7 +786,7 @@ export const useMindMap = (
         dispatch(action);
     }, [dispatch]);
     
-    const syncData = useCallback((newMindMapData: MindMapData) => {
+    const syncData = useCallback((newMindMapData: MindMapData, preserveHistory: boolean = false) => {
         const currentMindMap = mindMapRef.current;
         
         // The reducer merges the new data with existing layout information
@@ -798,8 +806,14 @@ export const useMindMap = (
             onDataChangeRef.current(convertDataChangeInfo(info));
         }
         
-        // Reset history with the new, synchronized, and laid-out state
-        dispatch({ type: 'RESET_HISTORY', payload: laidOutMap });
+        if (preserveHistory) {
+            // Use UPDATE_PRESENT_STATE to update the current view without clearing history.
+            // This assumes the sync is a non-destructive update (e.g. filling in IDs) relative to the current state.
+            dispatch({ type: 'UPDATE_PRESENT_STATE', payload: laidOutMap });
+        } else {
+            // Reset history with the new, synchronized, and laid-out state. This is the default behavior for full loads/saves.
+            dispatch({ type: 'RESET_HISTORY', payload: laidOutMap });
+        }
     }, [dispatch]);
 
 

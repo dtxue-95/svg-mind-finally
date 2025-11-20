@@ -1,3 +1,4 @@
+
 /* === Root Variables === */
 :root {
   --background-color: #f7f7f7;
@@ -1741,4 +1742,51 @@ foreignObject[data-dragging='true'] {
   border-color: #d9d9d9;
   color: #ccc;
   cursor: not-allowed;
+}
+
+/* === Toast Message === */
+.toast-message {
+    position: absolute; /* Changed from fixed */
+    top: 100px;         /* Increased from 80px */
+    left: 50%;
+    transform: translateX(-50%);
+    background-color: #fff;
+    border-radius: 8px;
+    padding: 12px 20px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    z-index: 2000;
+    animation: slideInDown 0.3s ease-out;
+    border: 1px solid #eee;
+    max-width: 80%;
+    pointer-events: all;
+    user-select: text;
+    -webkit-user-select: text;
+}
+
+@keyframes slideInDown {
+    from { opacity: 0; transform: translate(-50%, -20px); }
+    to { opacity: 1; transform: translate(-50%, 0); }
+}
+
+.toast-message--error {
+    border-left: 4px solid #ff3b30;
+}
+.toast-message--error svg {
+    color: #ff3b30;
+}
+
+.toast-message--success {
+    border-left: 4px solid #34c759;
+}
+.toast-message--success svg {
+    color: #34c759;
+}
+
+.toast-message span {
+    font-size: 14px;
+    font-weight: 500;
+    color: #333;
 }

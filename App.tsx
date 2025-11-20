@@ -1,16 +1,18 @@
-import React, { useImperativeHandle, forwardRef, useCallback, useState, useEffect, useMemo } from 'react';
+import React, { useImperativeHandle, forwardRef, useCallback, useState, useEffect, useMemo, useRef } from 'react';
 import { useMindMap } from './hooks/useMindMap';
 import { MindMapCanvas } from './components/MindMapCanvas';
-import type { RawNode, CommandId, NodeType, DataChangeCallback, DataChangeInfo, MindMapNodeData, ReviewStatusCode, ScoreInfo, ConnectorStyle } from './types';
+import type { RawNode, CommandId, NodeType, DataChangeCallback, DataChangeInfo, MindMapData, MindMapNodeData, ReviewStatusCode, ScoreInfo, ConnectorStyle, ValidationConfig } from './types';
 import { OperationType } from './types';
 import { createInitialMindMap } from './utils/createInitialMindMap';
 import { convertDataChangeInfo } from './utils/callbackDataConverter';
 import { getNodeChainByUuid } from './utils/dataChangeUtils';
+import { validateMindMap } from './utils/validation';
 
 // Export Panel component and types for external use
 export { Panel } from './components/Panel';
 export type { PanelPosition } from './components/Panel';
 export type { RawNode, CommandId, NodeType, DataChangeCallback, DataChangeInfo, MindMapNodeData, ConnectorStyle };
+export { OperationType };
 
 
 const defaultTopCommands: CommandId[] = ['undo', 'redo', 'separator', 'addSibling', 'addChild', 'delete', 'save', 'closeTop'];
@@ -27,7 +29,7 @@ export interface AppRef {
   executeUseCase: (nodeUuid: string) => void;
   submitDefect: (nodeUuid: string) => void;
   setData: (newData: RawNode) => void;
-  syncData: (newData: RawNode) => void;
+  syncData: (newData: RawNode, preserveHistory?: boolean) => void;
   resetHistory: () => void;
   setReadOnly: (isReadOnly: boolean) => void;
   confirmReviewStatus: (nodeUuid: string, newStatus: ReviewStatusCode) => void;
@@ -63,6 +65,7 @@ interface AppProps {
     onConfirmReviewStatus?: (info: DataChangeInfo) => void;
     onConfirmRemark?: (info: DataChangeInfo) => void;
     onConfirmScore?: (info: DataChangeInfo) => void;
+    onReadOnlyChange?: (isReadOnly: boolean) => void;
     canvasBackgroundColor?: string;
     showBackgroundDots?: boolean;
     showMinimap?: boolean;
@@ -80,6 +83,10 @@ interface AppProps {
     enableBulkReviewContextMenu?: boolean;
     enableSingleReviewContextMenu?: boolean;
     connectorStyle?: ConnectorStyle;
+    enableAutoSave?: boolean;
+    autoSaveDelay?: number;
+    enableSaveValidation?: boolean;
+    validationConfig?: ValidationConfig;
     children?: React.ReactNode;
 }
 
@@ -109,6 +116,7 @@ const App = forwardRef<AppRef, AppProps>(({
     onConfirmReviewStatus = (info) => { console.log('Review status confirmed:', info); },
     onConfirmRemark = (info) => { console.log('Remark confirmed:', info); },
     onConfirmScore = (info) => { console.log('Score confirmed:', info); },
+    onReadOnlyChange,
     canvasBackgroundColor = '#f7f7f7',
     showBackgroundDots = true,
     showMinimap = false,
@@ -126,12 +134,17 @@ const App = forwardRef<AppRef, AppProps>(({
     enableBulkReviewContextMenu = true,
     enableSingleReviewContextMenu = true,
     connectorStyle = 'elbow',
+    enableAutoSave = false,
+    autoSaveDelay = 1000,
+    enableSaveValidation = true,
+    validationConfig = { requirePriority: true, requirePrecondition: true },
     children,
 }, ref) => {
     // State to hold the data for the mind map. Initialized from props.
     const [currentData, setCurrentData] = useState<RawNode>(initialData);
     const [isReadOnly, setIsReadOnly] = useState(true);
     const [newlyAddedNodeUuid, setNewlyAddedNodeUuid] = useState<string | null>(null);
+    const [toast, setToast] = useState<{ visible: boolean; message: string; type: 'error' | 'success' }>({ visible: false, message: '', type: 'error' });
 
     // Effect to update the internal state when the initialData prop changes.
     // This allows the mind map to update when data is loaded asynchronously.
@@ -141,10 +154,101 @@ const App = forwardRef<AppRef, AppProps>(({
             setCurrentData(initialData);
         }
     }, [initialData, currentData?.uuid]);
+    
+    // Notify parent component when ReadOnly state changes
+    useEffect(() => {
+        if (onReadOnlyChange) {
+            onReadOnlyChange(isReadOnly);
+        }
+    }, [isReadOnly, onReadOnlyChange]);
 
     // Create the mind map structure from the current data state.
     // useMemo ensures this expensive operation only runs when data changes.
     const initialMindMap = useMemo(() => createInitialMindMap(currentData), [currentData]);
+
+    // Ref to access the latest mindMap state inside async callbacks (like auto-save timeout)
+    const mindMapRef = useRef<any>(null);
+
+    // Auto-save timer ref
+    const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    const performValidation = useCallback((mindMap: MindMapData): boolean => {
+        if (!enableSaveValidation) return true;
+        
+        const result = validateMindMap(mindMap, validationConfig);
+        if (!result.isValid) {
+            setToast({ visible: true, message: result.message || '校验失败', type: 'error' });
+            return false;
+        }
+        return true;
+    }, [enableSaveValidation, validationConfig]);
+
+    // Wrapper for onDataChange to inject auto-save logic
+    const handleDataChangeWrapper = useCallback((info: DataChangeInfo) => {
+        // 1. Always call the consumer's onDataChange first
+        if (onDataChange) {
+            onDataChange(info);
+        }
+
+        // 2. Handle Auto-Save Logic
+        if (enableAutoSave && onSave) {
+            // Operations that should NOT trigger an auto-save
+            const ignoredOperations = [
+                OperationType.SELECT_NODE,
+                OperationType.LOAD_DATA,
+                OperationType.SYNC_DATA,
+                OperationType.LAYOUT,
+                OperationType.EXPAND_NODES,
+                OperationType.TOGGLE_NODE_COLLAPSE,
+                OperationType.SAVE // Avoid recursion if saving triggers a change event
+            ];
+
+            if (!ignoredOperations.includes(info.operationType)) {
+                // Clear existing timer
+                if (autoSaveTimerRef.current) {
+                    clearTimeout(autoSaveTimerRef.current);
+                }
+
+                // Set new timer
+                autoSaveTimerRef.current = setTimeout(() => {
+                    // Access the latest mindMap state from the ref
+                    const currentMap = mindMapRef.current;
+                    if (currentMap) {
+                        // Check Validation
+                        if (!performValidation(currentMap)) {
+                            console.warn('Auto-save blocked by validation.');
+                            return;
+                        }
+
+                        // Construct a simplified DataChangeInfo for the save event
+                        // For a full save, previousData is essentially the same snapshot as currentData
+                        const saveData: DataChangeInfo = convertDataChangeInfo({
+                            operationType: OperationType.SAVE,
+                            timestamp: Date.now(),
+                            description: 'Auto-save triggered',
+                            previousData: currentMap,
+                            currentData: currentMap,
+                            affectedNodeUuids: Object.keys(currentMap.nodes),
+                        });
+                        onSave(saveData);
+                    }
+                }, autoSaveDelay);
+            }
+        }
+    }, [enableAutoSave, autoSaveDelay, onDataChange, onSave, performValidation]);
+
+    // Clean up timer on unmount or when auto-save is disabled
+    useEffect(() => {
+        if (!enableAutoSave && autoSaveTimerRef.current) {
+            clearTimeout(autoSaveTimerRef.current);
+            autoSaveTimerRef.current = null;
+        }
+        return () => {
+            if (autoSaveTimerRef.current) {
+                clearTimeout(autoSaveTimerRef.current);
+            }
+        };
+    }, [enableAutoSave]);
 
     const {
         mindMap,
@@ -177,7 +281,12 @@ const App = forwardRef<AppRef, AppProps>(({
         canRedo,
         isDirty,
         resetHistory,
-    } = useMindMap(initialMindMap, strictMode, onDataChange, onConfirmReviewStatus, onConfirmRemark, onConfirmScore);
+    } = useMindMap(initialMindMap, strictMode, handleDataChangeWrapper, onConfirmReviewStatus, onConfirmRemark, onConfirmScore);
+
+    // Update the ref whenever mindMap changes so auto-save uses the freshest data
+    useEffect(() => {
+        mindMapRef.current = mindMap;
+    }, [mindMap]);
 
     const handleAddChildNode = useCallback((parentUuid: string) => {
         const newUuid = addChildNode(parentUuid);
@@ -288,9 +397,9 @@ const App = forwardRef<AppRef, AppProps>(({
             resetHistory();
             setIsReadOnly(true);
         },
-        syncData: (newData: RawNode) => {
+        syncData: (newData: RawNode, preserveHistory = false) => {
             const newMindMap = createInitialMindMap(newData);
-            syncData(newMindMap);
+            syncData(newMindMap, preserveHistory);
         },
         resetHistory: () => {
             resetHistory();
@@ -316,6 +425,10 @@ const App = forwardRef<AppRef, AppProps>(({
     }), [constructSavePayload, enableUseCaseExecution, handleExecuteUseCase, handleSubmitDefect, enableDefectSubmission, resetHistory, confirmReviewStatus, getReviewStatusUpdateInfo, confirmRemark, confirmScore, partialUpdateNode, syncData]);
 
     const handleSaveRequest = () => {
+        if (!performValidation(mindMap)) {
+            return;
+        }
+        
         if (onSave) {
             const saveData = constructSavePayload();
             onSave(saveData);
@@ -324,6 +437,10 @@ const App = forwardRef<AppRef, AppProps>(({
 
     const handleToggleReadOnly = useCallback(() => {
         setIsReadOnly(prev => !prev);
+    }, []);
+    
+    const handleCloseToast = useCallback(() => {
+        setToast(prev => ({ ...prev, visible: false }));
     }, []);
 
     return (
@@ -398,6 +515,8 @@ const App = forwardRef<AppRef, AppProps>(({
                 enableBulkReviewContextMenu={enableBulkReviewContextMenu}
                 enableSingleReviewContextMenu={enableSingleReviewContextMenu}
                 connectorStyle={connectorStyle}
+                toast={toast}
+                onCloseToast={handleCloseToast}
             >
                 {children}
             </MindMapCanvas>

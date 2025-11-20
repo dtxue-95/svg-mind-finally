@@ -1,3 +1,4 @@
+
 import React, { useCallback, useRef, useEffect, useReducer, useMemo, useState } from 'react';
 import type { MindMapData, CommandId, MindMapNodeData, NodeType, NodePriority, DataChangeCallback, CanvasTransform, ReviewStatusCode, ScoreInfo, ConnectorStyle } from '../types';
 import { MindMapNode } from './MindMapNode';
@@ -23,6 +24,7 @@ import { getNodeChainByUuid } from '../utils/dataChangeUtils';
 import { convertDataChangeInfo } from '../utils/callbackDataConverter';
 import { HORIZONTAL_SPACING, VERTICAL_SPACING } from '../constants';
 import { FiEye, FiEdit2, FiCommand } from 'react-icons/fi';
+import { Toast } from './Toast';
 
 
 interface ReadOnlyToggleProps {
@@ -84,7 +86,7 @@ interface MindMapCanvasProps {
     onAddChildNode: (parentUuid: string) => void;
     onAddSiblingNode: (nodeUuid: string) => void;
     onDeleteNode: (nodeUuid: string) => void;
-    onFinishEditing: (nodeUuid: string, name: string, size: { width: number; height: number; }, initialSize: { width: number; height: number; }) => void;
+    onFinishEditing: (nodeUuid: string, name: string, size: { width: number; height: number; }, initialSize: { width: number; height: number; }, isInitialEdit?: boolean) => void;
     onUpdateNodePosition: (nodeUuid: string, position: {x: number, y: number}) => void;
     onReparentNode: (nodeUuid: string, newParentUuid: string) => void;
     onReorderNode: (draggedNodeUuid: string, targetSiblingUuid: string, position: 'before' | 'after') => void;
@@ -150,6 +152,8 @@ interface MindMapCanvasProps {
     enableBulkReviewContextMenu: boolean;
     enableSingleReviewContextMenu: boolean;
     connectorStyle: ConnectorStyle;
+    toast?: { visible: boolean; message: string; type: 'error' | 'success' };
+    onCloseToast?: () => void;
 }
 
 const SvgPath = React.memo(({ d, className }: { d: string, className: string }) => {
@@ -167,7 +171,7 @@ const AUTO_PAN_SPEED = 10;
 
 export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
     mindMapData, onAddChildNode, onAddSiblingNode, onDeleteNode, onFinishEditing, onUpdateNodePosition, onReparentNode, onReorderNode, onLayout, onUpdateNodeSize, onSave, showAITag, isDraggable = false, enableStrictDrag = false, enableNodeReorder = true, reorderableNodeTypes, showNodeType, showPriority, onToggleCollapse, onExpandNodes, onExpandAllNodes, onCollapseAllNodes, onExpandToLevel, onCollapseToLevel, onUpdateNodeType, onUpdateNodePriority, onConfirmReviewStatus, onConfirmRemark, onConfirmScore, onSubmitDefect,
-    onUndo, onRedo, canUndo, canRedo, showTopToolbar, showBottomToolbar, topToolbarCommands, bottomToolbarCommands, strictMode = false, showContextMenu = true, showCanvasContextMenu = true, priorityEditableNodeTypes, onDataChange, onExecuteUseCase, enableUseCaseExecution, enableDefectSubmission, canvasBackgroundColor, showBackgroundDots, showMinimap, getNodeBackgroundColor, enableReadOnlyUseCaseExecution, enableExpandCollapseByLevel, isReadOnly, onToggleReadOnly, onSetReadOnly, isDirty, children, newlyAddedNodeUuid, onNodeFocused, showReadOnlyToggleButtons, showShortcutsButton, enableReviewStatus, enableNodeRemarks, enableNodeScoring, reviewStatusNodeTypes, nodeRemarksNodeTypes, nodeScoringNodeTypes, enableBulkReviewContextMenu, enableSingleReviewContextMenu, connectorStyle
+    onUndo, onRedo, canUndo, canRedo, showTopToolbar, showBottomToolbar, topToolbarCommands, bottomToolbarCommands, strictMode = false, showContextMenu = true, showCanvasContextMenu = true, priorityEditableNodeTypes, onDataChange, onExecuteUseCase, enableUseCaseExecution, enableDefectSubmission, canvasBackgroundColor, showBackgroundDots, showMinimap, getNodeBackgroundColor, enableReadOnlyUseCaseExecution, enableExpandCollapseByLevel, isReadOnly, onToggleReadOnly, onSetReadOnly, isDirty, children, newlyAddedNodeUuid, onNodeFocused, showReadOnlyToggleButtons, showShortcutsButton, enableReviewStatus, enableNodeRemarks, enableNodeScoring, reviewStatusNodeTypes, nodeRemarksNodeTypes, nodeScoringNodeTypes, enableBulkReviewContextMenu, enableSingleReviewContextMenu, connectorStyle, toast, onCloseToast
 }) => {
     const [canvasState, dispatch] = useReducer(canvasReducer, {
         rootUuid: mindMapData.rootUuid,
@@ -1075,6 +1079,15 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
                 ) : (
                     <ToolbarHandle position="top" onClick={handleShowTopToolbar} />
                 )
+            )}
+
+            {toast && onCloseToast && (
+                <Toast
+                    message={toast.message}
+                    type={toast.type}
+                    visible={toast.visible}
+                    onClose={onCloseToast}
+                />
             )}
 
             {isSearchActive && (

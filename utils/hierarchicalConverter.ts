@@ -1,3 +1,4 @@
+
 import { MindMapData, MindMapNodeData, RawNode, reverseNodeTypeMapping, reversePriorityMapping } from '../types';
 
 /**
@@ -18,6 +19,7 @@ export const convertSingleMindMapNodeToRawNode = (node?: MindMapNodeData): RawNo
         id: node.id,
         parentId: node.parentId,
         sortNumber: node.sortNumber,
+        
         // Review fields
         hasRemark: node.hasRemark,
         hasScore: node.hasScore,
@@ -26,6 +28,13 @@ export const convertSingleMindMapNodeToRawNode = (node?: MindMapNodeData): RawNo
         reviewStatusCode: node.reviewStatusCode,
         reviewStatusName: node.reviewStatusName,
     };
+
+    // Strict handling: Only add DTOs if the node type is USE_CASE
+    if (node.nodeType === 'USE_CASE') {
+        rawNode.functionTestCaseDTO = node.functionTestCaseDTO;
+        rawNode.apiTestCaseDTO = node.apiTestCaseDTO;
+        rawNode.uiTestCaseDTO = node.uiTestCaseDTO;
+    }
 
     // Clean up undefined properties for a cleaner object
     if (rawNode.nodeType === undefined) delete rawNode.nodeType;

@@ -1,3 +1,4 @@
+
 import type { MindMapData, MindMapNodeData, RawNode, ReviewStatusCode } from '../types';
 import { nodeTypeMapping, priorityMapping } from '../types';
 import { MIN_NODE_HEIGHT } from '../constants';
@@ -80,7 +81,12 @@ export const createInitialMindMap = (rawData: RawNode): MindMapData => {
             parentId: rawNode.parentId,
         };
         
+        // Strict handling: Only assign DTOs if it is a caseNode
         if (rawNode.nodeType === 'caseNode') {
+            nodeData.functionTestCaseDTO = rawNode.functionTestCaseDTO;
+            nodeData.apiTestCaseDTO = rawNode.apiTestCaseDTO;
+            nodeData.uiTestCaseDTO = rawNode.uiTestCaseDTO;
+
             const tags: ('function' | 'api' | 'ui')[] = [];
             if (rawNode.functionTestCaseDTO) {
                 tags.push('function');

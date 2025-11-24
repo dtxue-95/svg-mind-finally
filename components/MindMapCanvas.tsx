@@ -1,4 +1,5 @@
 
+
 import React, { useCallback, useRef, useEffect, useReducer, useMemo, useState } from 'react';
 import type { MindMapData, CommandId, MindMapNodeData, NodeType, NodePriority, DataChangeCallback, CanvasTransform, ReviewStatusCode, ScoreInfo, ConnectorStyle } from '../types';
 import { MindMapNode } from './MindMapNode';
@@ -747,7 +748,7 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
                 }
             }
             if (activePopup.type) {
-                const popupClasses = {
+                const popupClasses: Record<string, string> = {
                     review: '.bulk-review-menu',
                     remark: '.remark-modal',
                     score: '.score-modal'

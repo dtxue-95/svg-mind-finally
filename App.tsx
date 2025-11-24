@@ -1,3 +1,4 @@
+
 import React, { useImperativeHandle, forwardRef, useCallback, useState, useEffect, useMemo, useRef } from 'react';
 import { useMindMap } from './hooks/useMindMap';
 import { MindMapCanvas } from './components/MindMapCanvas';
@@ -183,6 +184,11 @@ const App = forwardRef<AppRef, AppProps>(({
         return true;
     }, [enableSaveValidation, validationConfig]);
 
+    // Callback to handle errors during operations, such as validation failures when adding nodes
+    const handleError = useCallback((message: string) => {
+        setToast({ visible: true, message, type: 'error' });
+    }, []);
+
     // Wrapper for onDataChange to inject auto-save logic
     const handleDataChangeWrapper = useCallback((info: DataChangeInfo) => {
         // 1. Always call the consumer's onDataChange first
@@ -281,7 +287,7 @@ const App = forwardRef<AppRef, AppProps>(({
         canRedo,
         isDirty,
         resetHistory,
-    } = useMindMap(initialMindMap, strictMode, handleDataChangeWrapper, onConfirmReviewStatus, onConfirmRemark, onConfirmScore);
+    } = useMindMap(initialMindMap, strictMode, handleDataChangeWrapper, onConfirmReviewStatus, onConfirmRemark, onConfirmScore, enableSaveValidation ? validationConfig : undefined, handleError);
 
     // Update the ref whenever mindMap changes so auto-save uses the freshest data
     useEffect(() => {

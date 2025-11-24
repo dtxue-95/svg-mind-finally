@@ -1,10 +1,11 @@
+
 import { useReducer, useCallback, useEffect, useRef } from 'react';
 import { useAutoLayout } from './useAutoLayout';
 import { useNodeActions } from './useNodeActions';
 import { autoLayout } from '../utils/autoLayout';
 import { mindMapReducer, MindMapAction } from '../state/mindMapReducer';
 import { createHistoryReducer, HistoryAction } from './useMindMapState';
-import type { MindMapData, NodeType, NodePriority, DataChangeCallback, ReviewStatusCode, DataChangeInfo, MindMapNodeData, Remark, ScoreInfo } from '../types';
+import type { MindMapData, NodeType, NodePriority, DataChangeCallback, ReviewStatusCode, DataChangeInfo, MindMapNodeData, Remark, ScoreInfo, ValidationConfig } from '../types';
 import { OperationType } from '../types';
 import { getNodeChainByUuid } from '../utils/dataChangeUtils';
 import { convertDataChangeInfo } from '../utils/callbackDataConverter';
@@ -28,7 +29,9 @@ export const useMindMap = (
     onDataChange?: DataChangeCallback,
     onConfirmReviewStatus?: (info: DataChangeInfo) => void,
     onConfirmRemark?: (info: DataChangeInfo) => void,
-    onConfirmScore?: (info: DataChangeInfo) => void
+    onConfirmScore?: (info: DataChangeInfo) => void,
+    validationConfig?: ValidationConfig,
+    onError?: (message: string) => void
 ) => {
     const [history, dispatch] = useReducer(historicMindMapReducer, {
         past: [],
@@ -86,7 +89,7 @@ export const useMindMap = (
         deleteNode, 
         updateNodePosition,
         reparentNode,
-    } = useNodeActions(mindMap, dispatch, autoLayout, strictMode, onDataChange);
+    } = useNodeActions(mindMap, dispatch, autoLayout, strictMode, onDataChange, validationConfig, onError);
     
     useEffect(() => {
         if (onDataChange && !initialLoadFired.current) {

@@ -1,5 +1,6 @@
+
 import { useCallback, Dispatch } from 'react';
-import type { MindMapData, MindMapNodeData, NodeType, DataChangeCallback } from '../types';
+import type { MindMapData, MindMapNodeData, NodeType, DataChangeCallback, ValidationConfig } from '../types';
 import { NODE_TYPE_PROPS, MIN_NODE_HEIGHT, MIN_NODE_WIDTH } from '../constants';
 import { findAllDescendantUuids } from '../utils/findAllDescendantIds';
 import { getNodeChainByUuid } from '../utils/dataChangeUtils';
@@ -16,11 +17,23 @@ export const useNodeActions = (
     dispatch: DispatchFunction,
     performLayout: PerformLayoutFunction,
     strictMode: boolean,
-    onDataChange?: DataChangeCallback
+    onDataChange?: DataChangeCallback,
+    validationConfig?: ValidationConfig,
+    onError?: (message: string) => void
 ) => {
     const addChildNode = useCallback((parentUuid: string): string | undefined => {
         const parentNode = mindMap.nodes[parentUuid];
         if (!parentNode) return;
+
+        // Validation Logic: Block adding children if parent Use Case is invalid
+        if (validationConfig && parentNode.nodeType === 'USE_CASE') {
+            if (validationConfig.requirePriority && !parentNode.priorityLevel) {
+                if (onError) {
+                    onError(`操作失败：请先为用例节点 "${parentNode.name}" 选择优先级。`);
+                }
+                return;
+            }
+        }
 
         const newUuid = crypto.randomUUID();
         let newNode: MindMapNodeData;
@@ -164,7 +177,7 @@ export const useNodeActions = (
 
         return newUuid;
 
-    }, [mindMap, dispatch, performLayout, strictMode, onDataChange]);
+    }, [mindMap, dispatch, performLayout, strictMode, onDataChange, validationConfig, onError]);
 
     const addSiblingNode = useCallback((nodeUuid: string): string | undefined => {
         const parentUuid = mindMap.nodes[nodeUuid]?.parentUuid;

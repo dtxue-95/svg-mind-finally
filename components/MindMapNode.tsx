@@ -142,7 +142,28 @@ const MindMapNodeComponent: React.FC<MindMapNodeProps> = ({
                 onUpdateSize(node.uuid, { width: newWidth, height: newHeight }, { layout: true });
             }
         }
-    }, [node.uuid, node.name, node.width, node.height, node.nodeType, node.priorityLevel, JSON.stringify(node.caseTags), isEditing, name, onUpdateSize]);
+    }, [
+        node.uuid, 
+        node.name, 
+        node.width, 
+        node.height, 
+        node.nodeType, 
+        node.priorityLevel, 
+        JSON.stringify(node.caseTags), 
+        isEditing, 
+        name, 
+        onUpdateSize,
+        node.id, 
+        node.reviewStatusCode, 
+        node.hasRemark, 
+        node.hasScore, 
+        showReviewStatus, 
+        showRemarkIcon, 
+        showScoreInfo,
+        showAITag,
+        showNodeType,
+        showPriority
+    ]);
 
 
     useEffect(() => {

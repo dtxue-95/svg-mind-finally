@@ -347,6 +347,8 @@ foreignObject {
 .mind-map-node__text-wrapper {
     display: flex;
     align-items: center;
+    flex-grow: 1;
+    min-width: 0;
 }
 
 .mind-map-node__text {

@@ -137,7 +137,7 @@ const App = forwardRef<AppRef, AppProps>(({
     enableAutoSave = false,
     autoSaveDelay = 1000,
     enableSaveValidation = true,
-    validationConfig = { requirePriority: true, requirePrecondition: true },
+    validationConfig = { requirePriority: true, requirePrecondition: true, requireStep: true },
     children,
 }, ref) => {
     // State to hold the data for the mind map. Initialized from props.

@@ -1,4 +1,5 @@
-import type { CanvasTransform, MindMapNodeData, NodeType } from '../types';
+
+import type { CanvasTransform, MindMapNodeData, NodeType, SelectionBox } from '../types';
 
 export interface CanvasContextMenu {
     isVisible: boolean;
@@ -33,6 +34,8 @@ export interface DragState {
 export interface CanvasState {
     transform: CanvasTransform;
     selectedNodeUuid: string | null;
+    multiSelectedNodeUuids: Set<string>;
+    selectionBox: SelectionBox | null;
     isPanning: boolean;
     isBottomToolbarVisible: boolean;
     isTopToolbarVisible: boolean;
@@ -55,6 +58,8 @@ export const getInitialCanvasState = (rootUuid: string, options: {
         translateY: 0,
     },
     selectedNodeUuid: rootUuid,
+    multiSelectedNodeUuids: new Set(),
+    selectionBox: null,
     isPanning: false,
     isBottomToolbarVisible: options.showBottomToolbar ?? true,
     isTopToolbarVisible: options.showTopToolbar ?? true,

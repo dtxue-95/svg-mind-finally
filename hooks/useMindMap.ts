@@ -819,6 +819,108 @@ export const useMindMap = (
         }
     }, [dispatch]);
 
+    const pasteNodes = useCallback((targetParentUuid: string, sourceNodeUuids: string[]) => {
+        const currentMindMap = mindMapRef.current;
+        const targetParent = currentMindMap.nodes[targetParentUuid];
+        
+        if (!targetParent || sourceNodeUuids.length === 0) return;
+
+        let nodesToPaste = sourceNodeUuids;
+
+        if (strictMode) {
+            const validNodes: string[] = [];
+            let hasError = false;
+
+            for (const sourceUuid of sourceNodeUuids) {
+                const sourceNode = currentMindMap.nodes[sourceUuid];
+                if (!sourceNode) continue;
+
+                let isValid = false;
+                let msg = '';
+
+                const pType = targetParent.nodeType;
+                const sType = sourceNode.nodeType;
+
+                switch (pType) {
+                    case 'DEMAND':
+                        if (sType === 'MODULE') isValid = true;
+                        else msg = '需求节点下只能粘贴模块节点';
+                        break;
+                    case 'MODULE':
+                        if (sType === 'TEST_POINT') isValid = true;
+                        else msg = '模块节点下只能粘贴测试点节点';
+                        break;
+                    case 'TEST_POINT':
+                        if (sType === 'USE_CASE') isValid = true;
+                        else msg = '测试点节点下只能粘贴用例节点';
+                        break;
+                    case 'USE_CASE':
+                        if (sType === 'PRECONDITION') {
+                            const children = (targetParent.childNodeList || []).map(id => currentMindMap.nodes[id]);
+                            const hasPre = children.some(n => n.nodeType === 'PRECONDITION');
+                            const pendingPre = validNodes.some(id => currentMindMap.nodes[id].nodeType === 'PRECONDITION');
+                            if (hasPre || pendingPre) msg = '用例节点只能有一个前置条件';
+                            else isValid = true;
+                        } else if (sType === 'STEP') {
+                            isValid = true;
+                        } else {
+                            msg = '用例节点下只能粘贴前置条件或步骤节点';
+                        }
+                        break;
+                    case 'STEP':
+                        if (sType === 'EXPECTED_RESULT') {
+                            const children = (targetParent.childNodeList || []).map(id => currentMindMap.nodes[id]);
+                            const hasRes = children.some(n => n.nodeType === 'EXPECTED_RESULT');
+                            const pendingRes = validNodes.some(id => currentMindMap.nodes[id].nodeType === 'EXPECTED_RESULT');
+                            if (hasRes || pendingRes) msg = '步骤节点只能有一个预期结果';
+                            else isValid = true;
+                        } else {
+                            msg = '步骤节点下只能粘贴预期结果节点';
+                        }
+                        break;
+                    case 'PRECONDITION':
+                    case 'EXPECTED_RESULT':
+                        msg = '该节点类型不支持粘贴子节点';
+                        break;
+                    default:
+                        // For GENERAL nodes or undefined, allow GENERAL or loose typing
+                        if (sType === 'GENERAL' || !pType) isValid = true;
+                        else msg = '无法粘贴到该类型的节点';
+                }
+
+                if (isValid) {
+                    validNodes.push(sourceUuid);
+                } else {
+                    if (!hasError && onError) {
+                        onError(msg);
+                        hasError = true; // Only show one toast per batch to avoid spam
+                    }
+                }
+            }
+            nodesToPaste = validNodes;
+        }
+
+        if (nodesToPaste.length === 0) return;
+
+        const action: MindMapAction = { type: 'PASTE_NODES', payload: { targetParentUuid, sourceNodeUuids: nodesToPaste } };
+        const nextState = mindMapReducer(currentMindMap, action);
+        const laidOutMap = autoLayout(nextState);
+
+        if (onDataChangeRef.current) {
+            const info = {
+                operationType: OperationType.PASTE_NODES,
+                timestamp: Date.now(),
+                description: `Pasted ${nodesToPaste.length} nodes into '${targetParent.name}'`,
+                previousData: currentMindMap,
+                currentData: laidOutMap,
+                affectedNodeUuids: [targetParentUuid, ...nodesToPaste], // Simplification
+            };
+            onDataChangeRef.current(convertDataChangeInfo(info));
+        }
+
+        dispatch({ type: 'SET_MIND_MAP', payload: laidOutMap });
+    }, [dispatch, strictMode, onError]);
+
 
     const resetHistory = useCallback(() => {
         dispatch({ type: 'CLEAR_HISTORY' });
@@ -850,6 +952,7 @@ export const useMindMap = (
         confirmScore,
         partialUpdateNode,
         syncData,
+        pasteNodes,
         undo,
         redo,
         canUndo,

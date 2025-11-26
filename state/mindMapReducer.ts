@@ -1,8 +1,8 @@
 
-
 import type { MindMapData, MindMapNodeData, NodeType, NodePriority, ReviewStatusCode, Remark, ScoreInfo } from '../types';
 import { NODE_TYPE_PROPS } from '../constants';
 import { findAllDescendantUuids, findAllDescendantUseCaseUuidsAndIds } from '../utils/findAllDescendantIds';
+import { cloneNodeTree } from '../utils/treeUtils';
 
 export type MindMapAction =
     | { type: 'SET_MIND_MAP'; payload: MindMapData }
@@ -24,7 +24,8 @@ export type MindMapAction =
     | { type: 'ADD_REMARK'; payload: { nodeUuid: string, remark: Remark } }
     | { type: 'UPDATE_SCORE_INFO'; payload: { nodeUuid: string, scoreInfo: ScoreInfo } }
     | { type: 'PARTIAL_UPDATE_NODE', payload: { nodeUuid: string, partialData: Partial<MindMapNodeData> } }
-    | { type: 'SYNC_DATA'; payload: MindMapData };
+    | { type: 'SYNC_DATA'; payload: MindMapData }
+    | { type: 'PASTE_NODES'; payload: { targetParentUuid: string; sourceNodeUuids: string[] } };
 
 // Defines the logical hierarchy of node types for level-based operations.
 const typeHierarchy: NodeType[] = ['DEMAND', 'MODULE', 'TEST_POINT', 'USE_CASE', 'PRECONDITION', 'STEP', 'EXPECTED_RESULT'];
@@ -565,6 +566,45 @@ export const mindMapReducer = (state: MindMapData, action: MindMapAction): MindM
             return {
                 rootUuid: newMindMapData.rootUuid,
                 nodes: mergedNodes
+            };
+        }
+
+        case 'PASTE_NODES': {
+            const { targetParentUuid, sourceNodeUuids } = action.payload;
+            const targetParent = state.nodes[targetParentUuid];
+            if (!targetParent) return state;
+
+            // Make a copy of the current nodes map
+            let newNodes = { ...state.nodes };
+            let updatedChildList = [...(targetParent.childNodeList || [])];
+
+            // Iterate through source UUIDs and clone each tree
+            sourceNodeUuids.forEach(sourceUuid => {
+                const result = cloneNodeTree(sourceUuid, state, targetParentUuid);
+                if (result) {
+                    const { newRootNode, newNodesMap } = result;
+                    // Merge new nodes into the map
+                    newNodes = { ...newNodes, ...newNodesMap };
+                    // Add new root's UUID to the parent's child list
+                    updatedChildList.push(newRootNode.uuid!);
+                }
+            });
+
+            // Update parent with new children list and update sortNumbers
+            updatedChildList.forEach((childUuid, index) => {
+                if (newNodes[childUuid]) {
+                    newNodes[childUuid] = { ...newNodes[childUuid], sortNumber: index + 1 };
+                }
+            });
+
+            newNodes[targetParentUuid] = {
+                ...targetParent,
+                childNodeList: updatedChildList
+            };
+
+            return {
+                ...state,
+                nodes: newNodes
             };
         }
 

@@ -1,4 +1,5 @@
 
+
 /* === Root Variables === */
 :root {
   --background-color: #f7f7f7;
@@ -755,8 +756,8 @@ foreignObject[data-dragging='true'] {
   background-color: #fff;
   border-radius: 12px;
   box-shadow: 0 5px 25px rgba(0, 0, 0, 0.15);
-  padding: 6px;
-  min-width: 180px;
+  padding: 4px; /* Reduced from 6px */
+  min-width: 160px; /* Reduced from 180px */
   pointer-events: all;
 }
 
@@ -774,13 +775,13 @@ foreignObject[data-dragging='true'] {
   display: flex;
   align-items: center;
   width: 100%;
-  padding: 8px 12px;
+  padding: 6px 10px; /* Reduced from 8px 12px */
   border: none;
   background-color: transparent;
   border-radius: 8px;
   cursor: pointer;
   text-align: left;
-  font-size: 14px;
+  font-size: 13px; /* Reduced from 14px */
   color: #333;
   transition: background-color 0.15s ease, color 0.15s ease;
   white-space: nowrap;
@@ -796,9 +797,9 @@ foreignObject[data-dragging='true'] {
 }
 
 .context-menu__item button svg {
-  margin-right: 12px;
-  width: 16px;
-  height: 16px;
+  margin-right: 8px; /* Reduced from 12px */
+  width: 14px; /* Reduced from 16px */
+  height: 14px; /* Reduced from 16px */
   color: #555;
 }
 
@@ -808,26 +809,26 @@ foreignObject[data-dragging='true'] {
 
 .context-menu__item .submenu-arrow {
     margin-left: auto;
-    font-size: 12px;
+    font-size: 10px; /* Reduced from 12px */
     color: #888;
 }
 
 .context-menu__separator {
   height: 1px;
   background-color: #e8e8e8;
-  margin: 6px 0;
+  margin: 4px 0; /* Reduced from 6px 0 */
 }
 
 .context-menu--submenu {
     position: absolute;
-    top: -6px; /* Align with parent's padding */
+    top: -4px; /* Aligned with new padding */
     left: 100%;
     margin-left: 4px;
     /* Use explicit styles to match parent menu */
     background-color: #fff;
     border-radius: 12px;
     box-shadow: 0 5px 25px rgba(0, 0, 0, 0.15);
-    padding: 6px;
+    padding: 4px; /* Reduced from 6px */
     min-width: 100px;
     z-index: 1001;
 }
@@ -1791,4 +1792,13 @@ foreignObject[data-dragging='true'] {
     font-size: 14px;
     font-weight: 500;
     color: #333;
+}
+
+/* Selection Box */
+.selection-box {
+    position: absolute;
+    border: 1px solid #007aff;
+    background-color: rgba(0, 122, 255, 0.1);
+    pointer-events: none; /* Allow clicks to pass through */
+    z-index: 100; /* Above nodes but below menus */
 }

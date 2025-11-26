@@ -1,6 +1,7 @@
+
 import React, { useRef } from 'react';
 import {
-    FiPlus, FiTrash2, FiMaximize, FiMinimize, FiChevronsRight, FiEdit, FiPlay, FiCheckCircle, FiCheckSquare, FiAlertCircle,
+    FiPlus, FiTrash2, FiMaximize, FiMinimize, FiChevronsRight, FiEdit, FiPlay, FiCheckCircle, FiCheckSquare, FiAlertCircle, FiCopy, FiClipboard
 } from 'react-icons/fi';
 import { FaSitemap } from 'react-icons/fa6';
 import type { MindMapNodeData, NodeType, NodePriority } from '../types';
@@ -31,10 +32,14 @@ interface ContextMenuProps {
     onOpenReviewContextMenu: (nodeUuid: string, event: React.MouseEvent) => void;
     enableBulkReviewContextMenu: boolean;
     enableSingleReviewContextMenu: boolean;
+    enableNodeCopy: boolean;
+    onCopy: () => void;
+    canPaste?: boolean;
+    onPaste?: () => void;
 }
 
 export const ContextMenu: React.FC<ContextMenuProps> = ({
-    x, y, node, onClose, onAddChildNode, onAddSiblingNode, onDeleteNode, onToggleCollapse, onUpdateNodeType, onUpdateNodePriority, isRoot, isReadOnly, strictMode, priorityEditableNodeTypes, onExecuteUseCase, onSubmitDefect, enableUseCaseExecution, enableDefectSubmission, isReadOnlyContext, onOpenReviewContextMenu, enableBulkReviewContextMenu, enableSingleReviewContextMenu
+    x, y, node, onClose, onAddChildNode, onAddSiblingNode, onDeleteNode, onToggleCollapse, onUpdateNodeType, onUpdateNodePriority, isRoot, isReadOnly, strictMode, priorityEditableNodeTypes, onExecuteUseCase, onSubmitDefect, enableUseCaseExecution, enableDefectSubmission, isReadOnlyContext, onOpenReviewContextMenu, enableBulkReviewContextMenu, enableSingleReviewContextMenu, enableNodeCopy, onCopy, canPaste, onPaste
 }) => {
     const menuRef = useRef<HTMLDivElement>(null);
     const style = usePopoverPositioning(menuRef, x, y);
@@ -56,6 +61,8 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
         }
         onClose();
     };
+    const handleCopy = () => { onCopy(); onClose(); };
+    const handlePaste = () => { onPaste?.(); onClose(); };
 
     // --- Special render for read-only context ---
     if (isReadOnlyContext) {
@@ -65,7 +72,7 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
         const canBulkReview = enableBulkReviewContextMenu && isParentForReview;
         const canSingleReview = enableSingleReviewContextMenu && isUseCase;
 
-        const showSubmitDefect = enableDefectSubmission;
+        const showSubmitDefect = enableDefectSubmission && isUseCase;
         const submitDefectDisabled = isRoot;
 
         const hasAnyPreviousActions = canExecute || canBulkReview || canSingleReview;
@@ -109,7 +116,7 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
     const showBulkReview = enableBulkReviewContextMenu && isParentNode;
     const showSingleReview = enableSingleReviewContextMenu && isUseCaseNode;
     const showExecuteUseCase = enableUseCaseExecution && isUseCaseNode;
-    const showSubmitDefect = enableDefectSubmission;
+    const showSubmitDefect = enableDefectSubmission && isUseCaseNode;
 
     const hasActionBlock = showBulkReview || showSingleReview || showExecuteUseCase || showSubmitDefect;
 
@@ -124,7 +131,11 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
                     .filter(([key]) => key !== 'GENERAL' && key !== 'DEMAND')
                     .map(([key, props]) => (
                     <ContextMenuItem key={key} onClick={() => handleUpdateNodeType(key as NodeType)} centerContent={true}>
-                        <span className="node-type-tag" style={{ backgroundColor: props.backgroundColor, borderColor: props.borderColor, color: props.color }}>
+                        <span className="node-type-tag" style={{
+                            backgroundColor: props.backgroundColor,
+                            borderColor: props.borderColor,
+                            color: props.color
+                        }}>
                             {props.label}
                         </span>
                     </ContextMenuItem>
@@ -134,81 +145,69 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
     ) : null;
 
     const prioritySubmenu = canEditPriority ? (
-      <div className="context-menu context-menu--submenu">
-        <ul>
-          {Object.entries(PRIORITY_PROPS).map(([key, props]) => (
-            <ContextMenuItem key={key} onClick={() => handleUpdatePriority(key as NodePriority)} centerContent={true}>
-                <span 
-                    className="node-priorityLevel-tag" 
-                    style={{ backgroundColor: props.backgroundColor, color: props.color }}
-                >
-                    {key}
-                </span>
-            </ContextMenuItem>
-          ))}
-          <ContextMenuItem isSeparator />
-          <ContextMenuItem onClick={() => handleUpdatePriority(null)}>
-            移除
-          </ContextMenuItem>
-        </ul>
-      </div>
+        <div className="context-menu context-menu--submenu">
+            <ul>
+                <ContextMenuItem onClick={() => handleUpdatePriority(null)} centerContent={true}>
+                    <span style={{ fontSize: '13px', color: '#888' }}>无优先级</span>
+                </ContextMenuItem>
+                {Object.entries(PRIORITY_PROPS).map(([key, props]) => (
+                    <ContextMenuItem key={key} onClick={() => handleUpdatePriority(key as NodePriority)} centerContent={true}>
+                        <span className="node-priorityLevel-tag" style={{ backgroundColor: props.backgroundColor, color: props.color }}>
+                            {key}
+                        </span>
+                    </ContextMenuItem>
+                ))}
+            </ul>
+        </div>
     ) : null;
-
 
     return (
         <div ref={menuRef} className="context-menu" style={style} onContextMenu={(e) => e.preventDefault()}>
             <ul>
-                <ContextMenuItem onClick={handleAddSibling} disabled={addSiblingDisabled}>
-                    <FiPlus /> 添加同级节点
-                </ContextMenuItem>
-                <ContextMenuItem onClick={handleAddChild} disabled={addChildDisabled}>
-                    <FaSitemap /> 添加子节点
-                </ContextMenuItem>
-                
-                {isGeneralNode && (
-                    <ContextMenuItem onClick={() => {}} hasSubmenu={true} submenu={nodeTypeSubmenu} disabled={isReadOnly}>
+                {/* Group 1: Add Nodes */}
+                <ContextMenuItem onClick={handleAddSibling} disabled={addSiblingDisabled}><FiPlus /> 添加同级节点</ContextMenuItem>
+                <ContextMenuItem onClick={handleAddChild} disabled={addChildDisabled}><FaSitemap /> 添加子节点</ContextMenuItem>
+                <ContextMenuItem isSeparator />
+
+                {/* Group 2: Priority (and Node Type) */}
+                {canEditPriority && (
+                    <ContextMenuItem hasSubmenu submenu={prioritySubmenu}>
+                        <FiChevronsRight /> 优先级
+                    </ContextMenuItem>
+                )}
+                {isGeneralNode && !isReadOnly && (
+                    <ContextMenuItem hasSubmenu submenu={nodeTypeSubmenu}>
                         <FiEdit /> 修改节点类型
                     </ContextMenuItem>
                 )}
-                
-                {canEditPriority && (
-                    <ContextMenuItem onClick={() => {}} hasSubmenu={true} submenu={prioritySubmenu} disabled={isReadOnly}>
-                        <FiChevronsRight /> {node.priorityLevel ? '修改优先级' : '添加优先级'}
-                    </ContextMenuItem>
+                {(canEditPriority || (isGeneralNode && !isReadOnly)) && <ContextMenuItem isSeparator />}
+
+                {/* Group 3: Workflow (Review, Execute, Defect) */}
+                {hasActionBlock && (
+                    <>
+                        {showBulkReview && <ContextMenuItem onClick={handleOpenReview}><FiCheckCircle /> 一键评审用例</ContextMenuItem>}
+                        {showSingleReview && <ContextMenuItem onClick={handleOpenReview}><FiCheckSquare /> 评审用例</ContextMenuItem>}
+                        {showExecuteUseCase && <ContextMenuItem onClick={handleExecute} disabled={executeUseCaseDisabled}><FiPlay /> 执行用例</ContextMenuItem>}
+                        {showSubmitDefect && (
+                            <ContextMenuItem onClick={handleSubmitDefect} disabled={submitDefectDisabled}>
+                                <FiAlertCircle /> 提交缺陷
+                            </ContextMenuItem>
+                        )}
+                        <ContextMenuItem isSeparator />
+                    </>
                 )}
 
-                <ContextMenuItem onClick={handleDelete} disabled={deleteDisabled}>
-                    <FiTrash2 /> 删除节点
-                </ContextMenuItem>
-                
-                {hasActionBlock && <ContextMenuItem isSeparator />}
-                
-                {showBulkReview && (
-                    <ContextMenuItem onClick={handleOpenReview} disabled={isReadOnly}>
-                        <FiCheckCircle /> 一键评审用例
-                    </ContextMenuItem>
+                {/* Group 4: Copy, Paste & Delete */}
+                {enableNodeCopy && !isRoot && !isReadOnly && (
+                    <>
+                        <ContextMenuItem onClick={handleCopy}><FiCopy /> 复制节点</ContextMenuItem>
+                        <ContextMenuItem onClick={handlePaste} disabled={!canPaste}><FiClipboard /> 粘贴节点</ContextMenuItem>
+                    </>
                 )}
+                <ContextMenuItem onClick={handleDelete} disabled={deleteDisabled}><FiTrash2 /> 删除节点</ContextMenuItem>
+                <ContextMenuItem isSeparator />
                 
-                {showSingleReview && (
-                    <ContextMenuItem onClick={handleOpenReview} disabled={isReadOnly}>
-                        <FiCheckSquare /> 评审用例
-                    </ContextMenuItem>
-                )}
-
-                {showExecuteUseCase && (
-                    <ContextMenuItem onClick={handleExecute} disabled={executeUseCaseDisabled}>
-                        <FiPlay /> 执行用例
-                    </ContextMenuItem>
-                )}
-                
-                {showSubmitDefect && (
-                    <ContextMenuItem onClick={handleSubmitDefect} disabled={submitDefectDisabled}>
-                        <FiAlertCircle /> 提交缺陷
-                    </ContextMenuItem>
-                )}
-                
-                <li className="context-menu__separator" />
-                
+                {/* Group 5: Collapse/Expand */}
                 <ContextMenuItem onClick={handleToggleCollapse} disabled={toggleCollapseDisabled}>
                     {node.isCollapsed ? <FiMaximize /> : <FiMinimize />}
                     {node.isCollapsed ? '展开当前节点' : '收起当前节点'}

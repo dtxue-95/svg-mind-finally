@@ -1,5 +1,3 @@
-
-
 import React, { useCallback, useRef, useEffect, useReducer, useMemo, useState } from 'react';
 import type { MindMapData, CommandId, MindMapNodeData, NodeType, NodePriority, DataChangeCallback, CanvasTransform, ReviewStatusCode, ScoreInfo, ConnectorStyle } from '../types';
 import { MindMapNode } from './MindMapNode';
@@ -26,6 +24,7 @@ import { convertDataChangeInfo } from '../utils/callbackDataConverter';
 import { HORIZONTAL_SPACING, VERTICAL_SPACING } from '../constants';
 import { FiEye, FiEdit2, FiCommand } from 'react-icons/fi';
 import { Toast } from './Toast';
+import { filterSelectedNodesForCopy } from '../utils/treeUtils';
 
 
 interface ReadOnlyToggleProps {
@@ -155,6 +154,9 @@ interface MindMapCanvasProps {
     connectorStyle: ConnectorStyle;
     toast?: { visible: boolean; message: string; type: 'error' | 'success' };
     onCloseToast?: () => void;
+    enableRangeSelection?: boolean;
+    onPasteNodes?: (targetParentUuid: string, sourceNodeUuids: string[]) => void;
+    enableNodeCopy?: boolean;
 }
 
 const SvgPath = React.memo(({ d, className }: { d: string, className: string }) => {
@@ -172,7 +174,7 @@ const AUTO_PAN_SPEED = 10;
 
 export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
     mindMapData, onAddChildNode, onAddSiblingNode, onDeleteNode, onFinishEditing, onUpdateNodePosition, onReparentNode, onReorderNode, onLayout, onUpdateNodeSize, onSave, showAITag, isDraggable = false, enableStrictDrag = false, enableNodeReorder = true, reorderableNodeTypes, showNodeType, showPriority, onToggleCollapse, onExpandNodes, onExpandAllNodes, onCollapseAllNodes, onExpandToLevel, onCollapseToLevel, onUpdateNodeType, onUpdateNodePriority, onConfirmReviewStatus, onConfirmRemark, onConfirmScore, onSubmitDefect,
-    onUndo, onRedo, canUndo, canRedo, showTopToolbar, showBottomToolbar, topToolbarCommands, bottomToolbarCommands, strictMode = false, showContextMenu = true, showCanvasContextMenu = true, priorityEditableNodeTypes, onDataChange, onExecuteUseCase, enableUseCaseExecution, enableDefectSubmission, canvasBackgroundColor, showBackgroundDots, showMinimap, getNodeBackgroundColor, enableReadOnlyUseCaseExecution, enableExpandCollapseByLevel, isReadOnly, onToggleReadOnly, onSetReadOnly, isDirty, children, newlyAddedNodeUuid, onNodeFocused, showReadOnlyToggleButtons, showShortcutsButton, enableReviewStatus, enableNodeRemarks, enableNodeScoring, reviewStatusNodeTypes, nodeRemarksNodeTypes, nodeScoringNodeTypes, enableBulkReviewContextMenu, enableSingleReviewContextMenu, connectorStyle, toast, onCloseToast
+    onUndo, onRedo, canUndo, canRedo, showTopToolbar, showBottomToolbar, topToolbarCommands, bottomToolbarCommands, strictMode = false, showContextMenu = true, showCanvasContextMenu = true, priorityEditableNodeTypes, onDataChange, onExecuteUseCase, enableUseCaseExecution, enableDefectSubmission, canvasBackgroundColor, showBackgroundDots, showMinimap, getNodeBackgroundColor, enableReadOnlyUseCaseExecution, enableExpandCollapseByLevel, isReadOnly, onToggleReadOnly, onSetReadOnly, isDirty, children, newlyAddedNodeUuid, onNodeFocused, showReadOnlyToggleButtons, showShortcutsButton, enableReviewStatus, enableNodeRemarks, enableNodeScoring, reviewStatusNodeTypes, nodeRemarksNodeTypes, nodeScoringNodeTypes, enableBulkReviewContextMenu, enableSingleReviewContextMenu, connectorStyle, toast, onCloseToast, enableRangeSelection, onPasteNodes, enableNodeCopy = true
 }) => {
     const [canvasState, dispatch] = useReducer(canvasReducer, {
         rootUuid: mindMapData.rootUuid,
@@ -185,12 +187,16 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
     const canvasStateRef = useRef(canvasState);
     canvasStateRef.current = canvasState;
     
-    const { transform, selectedNodeUuid, dragState, isBottomToolbarVisible, isTopToolbarVisible, isSearchActive, searchQuery, searchMatches, currentMatchIndex, contextMenu, canvasContextMenu } = canvasState;
+    const { transform, selectedNodeUuid, multiSelectedNodeUuids, selectionBox, dragState, isBottomToolbarVisible, isTopToolbarVisible, isSearchActive, searchQuery, searchMatches, currentMatchIndex, contextMenu, canvasContextMenu } = canvasState;
     
     const canvasRef = useRef<HTMLDivElement>(null);
     const panStartPos = useRef({ x: 0, y: 0 });
     const dragStartPosRef = useRef({ x: 0, y: 0 });
     const shortcutsButtonRef = useRef<HTMLButtonElement>(null);
+    
+    // Internal clipboard to store UUIDs of nodes to copy
+    const clipboardRef = useRef<string[]>([]);
+    const [clipboardSize, setClipboardSize] = useState(0);
 
     const [isShortcutsPanelVisible, setIsShortcutsPanelVisible] = useState(false);
     const [shortcutsPanelPosition, setShortcutsPanelPosition] = useState<{top: number; right: number}>({ top: 0, right: 0 });
@@ -442,20 +448,61 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
         });
     }, [dispatch, mindMapData.nodes, visibleNodeUuids]);
 
-    // Effect for keyboard shortcuts
+    const handleCopyNodes = useCallback(() => {
+        if (!enableNodeCopy) return;
+        
+        if (selectedNodeUuid || multiSelectedNodeUuids.size > 0) {
+            const nodesToCopy = new Set(multiSelectedNodeUuids);
+            if (selectedNodeUuid) nodesToCopy.add(selectedNodeUuid);
+            
+            // Filter out descendants if their ancestor is also selected to avoid duplication
+            const filteredUuids = filterSelectedNodesForCopy(nodesToCopy, mindMapData);
+            clipboardRef.current = Array.from(filteredUuids);
+            setClipboardSize(clipboardRef.current.length);
+        }
+    }, [enableNodeCopy, selectedNodeUuid, multiSelectedNodeUuids, mindMapData]);
+
+    const performPaste = useCallback((targetNodeUuid: string) => {
+        if (!isReadOnly && clipboardRef.current.length > 0 && onPasteNodes) {
+            onPasteNodes(targetNodeUuid, clipboardRef.current);
+            // Clear clipboard after paste as requested
+            clipboardRef.current = [];
+            setClipboardSize(0);
+        }
+    }, [isReadOnly, onPasteNodes]);
+
+    const handlePasteToNode = useCallback((nodeUuid: string) => {
+        performPaste(nodeUuid);
+    }, [performPaste]);
+
+    // Effect for keyboard shortcuts (including Copy/Paste)
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
             const target = e.target as HTMLElement;
-            if (
-                target.tagName.toLowerCase() === 'input' ||
-                target.tagName.toLowerCase() === 'textarea' ||
-                target.isContentEditable
-            ) {
+            const isInput = target.tagName.toLowerCase() === 'input' || target.tagName.toLowerCase() === 'textarea' || target.isContentEditable;
+            
+            const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+            const metaOrCtrl = isMac ? e.metaKey : e.ctrlKey;
+
+            // Copy/Paste Logic
+            if (!isInput && metaOrCtrl && e.key.toLowerCase() === 'c') {
+                if (enableNodeCopy) {
+                    e.preventDefault();
+                    handleCopyNodes();
+                }
                 return;
             }
 
-            const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
-            const metaOrCtrl = isMac ? e.metaKey : e.ctrlKey;
+            if (!isInput && metaOrCtrl && e.key.toLowerCase() === 'v') {
+                if (selectedNodeUuid) {
+                    e.preventDefault();
+                    performPaste(selectedNodeUuid);
+                }
+                return;
+            }
+
+            // Standard shortcuts
+            if (isInput) return;
             
             if (metaOrCtrl && e.key.toLowerCase() === 's') {
                 e.preventDefault();
@@ -629,7 +676,8 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
         isReadOnly,
         isSearchActive,
         selectedNodeUuid,
-        mindMapData.rootUuid,
+        multiSelectedNodeUuids,
+        mindMapData,
         onUndo,
         onRedo,
         onAddChildNode,
@@ -640,8 +688,10 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
         handleFitView,
         handleCenterView,
         onToggleCollapse,
-        mindMapData.nodes,
         updateDrag,
+        enableNodeCopy,
+        handleCopyNodes,
+        performPaste
     ]);
 
      const handleCloseContextMenu = useCallback(() => {
@@ -815,6 +865,81 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
         window.addEventListener('mouseup', handleMouseUp);
     }, [dispatch]);
 
+    const startBoxSelection = useCallback((e: React.MouseEvent) => {
+        if (!canvasRef.current) return;
+        document.body.classList.add('canvas-interaction-no-select');
+        
+        // Convert client coordinates to canvas coordinates relative to the viewport
+        // The SelectionBox overlay uses absolute positioning on top of the canvas div
+        const rect = canvasRef.current.getBoundingClientRect();
+        const startX = e.clientX - rect.left;
+        const startY = e.clientY - rect.top;
+        
+        dispatch({ type: 'START_SELECTION', payload: { x: startX, y: startY } });
+
+        const handleMouseMove = (moveEvent: MouseEvent) => {
+            const currX = moveEvent.clientX - rect.left;
+            const currY = moveEvent.clientY - rect.top;
+            dispatch({ type: 'UPDATE_SELECTION', payload: { x: currX, y: currY } });
+        };
+
+        const handleMouseUp = (upEvent: MouseEvent) => {
+            const finalX = upEvent.clientX - rect.left;
+            const finalY = upEvent.clientY - rect.top;
+            
+            // Calculate selection logic
+            const boxLeft = Math.min(startX, finalX);
+            const boxTop = Math.min(startY, finalY);
+            const boxRight = Math.max(startX, finalX);
+            const boxBottom = Math.max(startY, finalY);
+            const boxWidth = boxRight - boxLeft;
+            const boxHeight = boxBottom - boxTop;
+
+            // Only process if box has significant size (avoid accidental clicks)
+            if (boxWidth > 5 || boxHeight > 5) {
+                const selectedUuids = new Set<string>();
+                
+                // Calculate intersection in Canvas Space (transforming box coordinates to world coordinates)
+                const { scale, translateX, translateY } = canvasStateRef.current.transform;
+                
+                // World coordinates of selection box
+                const worldLeft = (boxLeft - translateX) / scale;
+                const worldTop = (boxTop - translateY) / scale;
+                const worldRight = (boxRight - translateX) / scale;
+                const worldBottom = (boxBottom - translateY) / scale;
+
+                Object.values(mindMapData.nodes).forEach(node => {
+                    if (!node.position || !node.width || !node.height) return;
+                    
+                    const nodeLeft = node.position.x;
+                    const nodeTop = node.position.y;
+                    const nodeRight = node.position.x + node.width;
+                    const nodeBottom = node.position.y + node.height;
+
+                    // AABB Intersection check
+                    if (
+                        worldLeft < nodeRight &&
+                        worldRight > nodeLeft &&
+                        worldTop < nodeBottom &&
+                        worldBottom > nodeTop
+                    ) {
+                        selectedUuids.add(node.uuid!);
+                    }
+                });
+                
+                dispatch({ type: 'SET_MULTI_SELECTION', payload: { nodeUuids: selectedUuids } });
+            }
+
+            document.body.classList.remove('canvas-interaction-no-select');
+            dispatch({ type: 'END_SELECTION' });
+            window.removeEventListener('mousemove', handleMouseMove);
+            window.removeEventListener('mouseup', handleMouseUp);
+        };
+
+        window.addEventListener('mousemove', handleMouseMove);
+        window.addEventListener('mouseup', handleMouseUp);
+    }, [mindMapData.nodes]);
+
     const handleCanvasContextMenu = (e: React.MouseEvent<HTMLDivElement>) => {
         if (e.target !== e.currentTarget) return;
 
@@ -836,11 +961,15 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
 
         window.getSelection()?.removeAllRanges();
 
-        if (selectedNodeUuid) {
-            handleSelectNode(null);
+        // Determine action: Selection or Pan
+        if (enableRangeSelection && !isReadOnly && e.shiftKey) {
+            startBoxSelection(e);
+        } else {
+            if (selectedNodeUuid) {
+                handleSelectNode(null);
+            }
+            startPanning(e);
         }
-
-        startPanning(e);
     };
     
     const autoPanLoop = useCallback(() => {
@@ -970,6 +1099,8 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
 
     const handleSelectNode = useCallback((nodeUuid: string | null) => {
         if (!isSearchActive) {
+            // Use normal selection logic. If multi-selection is active via Shift/Ctrl logic elsewhere,
+            // this might need adjustment, but for simple click:
             dispatch({ type: 'SELECT_NODE', payload: { nodeUuid } });
         }
     }, [isSearchActive]);
@@ -1103,6 +1234,19 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
                 </div>
             )}
 
+            {/* Selection Box */}
+            {selectionBox && (
+                <div
+                    className="selection-box"
+                    style={{
+                        left: Math.min(selectionBox.startX, selectionBox.currentX),
+                        top: Math.min(selectionBox.startY, selectionBox.currentY),
+                        width: selectionBox.width,
+                        height: selectionBox.height,
+                    }}
+                />
+            )}
+
             <svg className="mind-map-canvas__svg-layer">
                 <g style={{
                     transform: `translate(${transform.translateX}px, ${transform.translateY}px) scale(${transform.scale})`,
@@ -1190,6 +1334,9 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
                         const showRemarkIcon = enableNodeRemarks && !!node.nodeType && nodeRemarksNodeTypes.includes(node.nodeType);
                         const showScoreInfo = enableNodeScoring && !!node.nodeType && nodeScoringNodeTypes.includes(node.nodeType);
 
+                        const isMultiSelected = multiSelectedNodeUuids.has(node.uuid!);
+                        const isPrimarySelected = selectedNodeUuid === node.uuid;
+
                         return (
                          <foreignObject
                             key={node.uuid}
@@ -1211,7 +1358,7 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
                             >
                                 <MindMapNode
                                     node={node}
-                                    isSelected={selectedNodeUuid === node.uuid}
+                                    isSelected={isPrimarySelected || isMultiSelected}
                                     isBeingDragged={isDragged && !!dragState?.offset}
                                     onSelect={handleSelectNode}
                                     onFinishEditing={onFinishEditing}
@@ -1303,6 +1450,10 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
                     onOpenReviewContextMenu={handleOpenReviewContextMenu}
                     enableBulkReviewContextMenu={enableBulkReviewContextMenu}
                     enableSingleReviewContextMenu={enableSingleReviewContextMenu}
+                    enableNodeCopy={enableNodeCopy}
+                    onCopy={handleCopyNodes}
+                    canPaste={clipboardSize > 0}
+                    onPaste={() => handlePasteToNode(contextMenuNode.uuid!)}
                 />
             )}
 

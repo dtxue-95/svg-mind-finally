@@ -1,13 +1,18 @@
 
 
+
 import type { CanvasState, DragState } from './canvasState';
-import type { CanvasTransform, MindMapData, MindMapNodeData, NodeType } from '../types';
+import type { CanvasTransform, MindMapData, MindMapNodeData, NodeType, SelectionBox } from '../types';
 
 export type CanvasAction =
     | { type: 'SET_TRANSFORM'; payload: Partial<CanvasTransform> }
     | { type: 'ZOOM'; payload: { scaleAmount: number; centerX: number; centerY: number } }
     | { type: 'PAN'; payload: { dx: number; dy: number } }
-    | { type: 'SELECT_NODE'; payload: { nodeUuid: string | null } }
+    | { type: 'SELECT_NODE'; payload: { nodeUuid: string | null; multiSelect?: boolean } }
+    | { type: 'SET_MULTI_SELECTION'; payload: { nodeUuids: Set<string> } }
+    | { type: 'START_SELECTION'; payload: { x: number; y: number } }
+    | { type: 'UPDATE_SELECTION'; payload: { x: number; y: number } }
+    | { type: 'END_SELECTION' }
     | { type: 'SET_PANNING'; payload: { isPanning: boolean } }
     | { type: 'SET_TOOLBAR_VISIBILITY'; payload: { isVisible: boolean } }
     | { type: 'SET_TOP_TOOLBAR_VISIBILITY'; payload: { isVisible: boolean } }
@@ -72,8 +77,76 @@ export const canvasReducer = (state: CanvasState, action: CanvasAction): CanvasS
                 },
             };
         }
-        case 'SELECT_NODE':
-            return { ...state, selectedNodeUuid: action.payload.nodeUuid };
+        case 'SELECT_NODE': {
+            const { nodeUuid, multiSelect } = action.payload;
+            let newMultiSelected = new Set(state.multiSelectedNodeUuids);
+            
+            if (nodeUuid) {
+                if (multiSelect) {
+                    // Toggle selection
+                    if (newMultiSelected.has(nodeUuid)) {
+                        newMultiSelected.delete(nodeUuid);
+                    } else {
+                        newMultiSelected.add(nodeUuid);
+                    }
+                } else {
+                    // Single select replaces all
+                    newMultiSelected = new Set([nodeUuid]);
+                }
+            } else {
+                // Clicked empty space without shift/ctrl usually clears selection, 
+                // unless we are panning or box selecting (handled elsewhere).
+                // But SELECT_NODE payload null usually implies clear.
+                if (!multiSelect) {
+                    newMultiSelected.clear();
+                }
+            }
+
+            return { 
+                ...state, 
+                selectedNodeUuid: nodeUuid, // Main "focused" node
+                multiSelectedNodeUuids: newMultiSelected
+            };
+        }
+        case 'SET_MULTI_SELECTION':
+            return { ...state, multiSelectedNodeUuids: action.payload.nodeUuids };
+        case 'START_SELECTION': {
+            const { x, y } = action.payload;
+            return {
+                ...state,
+                selectionBox: { startX: x, startY: y, currentX: x, currentY: y, width: 0, height: 0 },
+                selectedNodeUuid: null, // Clear focus when starting box select
+                // Optional: Clear existing multi-selection? Usually yes.
+                multiSelectedNodeUuids: new Set(), 
+            };
+        }
+        case 'UPDATE_SELECTION': {
+            const { x, y } = action.payload;
+            if (!state.selectionBox) return state;
+            
+            const startX = state.selectionBox.startX;
+            const startY = state.selectionBox.startY;
+            
+            const width = Math.abs(x - startX);
+            const height = Math.abs(y - startY);
+            
+            // Determine actual top-left of rect
+            const topLeftX = Math.min(startX, x);
+            const topLeftY = Math.min(startY, y);
+
+            return {
+                ...state,
+                selectionBox: {
+                    ...state.selectionBox,
+                    currentX: x,
+                    currentY: y,
+                    width,
+                    height
+                }
+            };
+        }
+        case 'END_SELECTION':
+            return { ...state, selectionBox: null };
         case 'SET_PANNING':
             return { ...state, isPanning: action.payload.isPanning };
         case 'SET_TOOLBAR_VISIBILITY':
@@ -118,6 +191,9 @@ export const canvasReducer = (state: CanvasState, action: CanvasAction): CanvasS
                 ...state,
                 contextMenu: { isVisible: true, ...action.payload },
                 canvasContextMenu: { ...state.canvasContextMenu, isVisible: false },
+                // When showing context menu for a specific node, ensure it's selected
+                selectedNodeUuid: action.payload.nodeUuid,
+                multiSelectedNodeUuids: new Set([action.payload.nodeUuid])
             };
         case 'HIDE_CONTEXT_MENU':
             return { ...state, contextMenu: { ...state.contextMenu, isVisible: false } };

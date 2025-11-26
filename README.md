@@ -11,12 +11,17 @@
         - **自由拖拽 (`isDraggable`)**: 自由移动节点位置，不改变其父子关系。
         - **结构化拖拽 (`enableStrictDrag`)**: 根据预设规则拖拽节点以更改其父节点。
         - **同级排序 (`enableNodeReorder`)**: 通过拖拽对同级节点进行排序。
+    - **复制与粘贴**: 支持框选或选中节点后复制 (`Ctrl+C`) 并粘贴 (`Ctrl+V`) 到其他节点下。支持跨层级复制，但在严格模式下会校验父子类型约束。
     - **键盘快捷键**: 支持 `Tab` (子节点), `Enter` (同级节点), `Delete` (删除), `Cmd/Ctrl+Z/Y` (撤销/重做) 等。
 - **评审与反馈系统**:
     - **评审状态**: 支持为节点设置“待评审”、“通过”、“未通过”状态，状态会从子节点向上聚合。
     - **一键评审**: 支持在父节点上批量更新所有后代用例的评审状态。
     - **节点备注**: 允许用户为节点添加多条带时间戳和用户信息的备注。
     - **节点评分**: 支持对节点进行五星评分并附带评语。
+- **自动保存与数据校验**:
+    - **智能自动保存**: 支持防抖（Debounce）机制的自动保存，仅在数据有效时触发。
+    - **数据完整性校验**: 内置校验规则（如用例优先级、前置条件检查），校验失败时自动拦截保存操作及部分编辑操作（如给未填优先级的用例添加子节点）。
+    - **交互式提示 (Toast)**: 校验错误或系统消息通过 Toast 组件展示，支持长文本显示，鼠标悬停时自动暂停消失计时，方便用户阅读。
 - **测试与开发集成**:
     - **执行用例**: 支持从用例节点触发执行操作，并通过 `onExecuteUseCase` 回调与外部测试系统集成。
     - **提交缺陷**: 支持从任意节点触发缺陷提交，通过 `onSubmitDefect` 回调获取节点上下文信息，与缺陷管理系统（如 Jira）集成。
@@ -65,6 +70,48 @@ root.render(
     <SimpleExample />
   </React.StrictMode>
 );
+```
+
+---
+
+## 自动保存与校验配置示例
+
+此示例展示了如何开启自动保存功能，并配置数据校验规则。
+
+```jsx
+import React, { useCallback } from 'react';
+import App from './App';
+import { mockInitialData } from './mockData';
+
+function AutoSaveExample() {
+    // 当自动保存触发或用户手动点击保存时调用
+    const handleSave = useCallback((info) => {
+        console.log('保存触发 (类型: ' + info.operationType + ')');
+        console.log('数据:', info.currentRawData);
+        // 在此处调用后端 API...
+    }, []);
+
+    return (
+        <div style={{width: '100%', height: '100vh'}}>
+            <App 
+                initialData={mockInitialData}
+                onSave={handleSave}
+                // 开启自动保存
+                enableAutoSave={true}
+                // 设置防抖时间为 2秒 (即停止操作 2秒后触发保存)
+                autoSaveDelay={2000}
+                // 开启保存时的校验
+                enableSaveValidation={true}
+                // 配置具体的校验规则
+                validationConfig={{
+                    requirePriority: true,      // 用例节点必须选择优先级
+                    requirePrecondition: true,  // 用例节点必须包含前置条件子节点
+                    requireStep: true           // 如果有前置条件，必须有步骤
+                }}
+            />
+        </div>
+    );
+}
 ```
 
 ---
@@ -207,21 +254,28 @@ root.render(<ComprehensiveExample />);
 | `initialData`           | `RawNode`                                | 用于初始化思维导图的层级化数据结构。**注意：** 这是一个受控属性。在组件挂载后，若此 prop 的引用发生变化（例如，父组件状态更新），将导致思维导图**完全重新加载**，当前的所有状态（包括编辑内容和历史记录）都将被**清空**。如需以命令式方式加载新数据，请使用 `ref.current.setData()` 方法。 | 内置的示例数据               |
 | `children`              | `React.ReactNode`                        | 在画布上渲染自定义子组件，通常与 `<Panel>` 组件结合使用。                                                                                                                                                                                                           | `undefined`                  |
 | `onDataChange`          | `(info: DataChangeInfo) => void`         | **核心回调**。当导图数据发生任何变更时触发。                                                                                                                                                                                                                        | `(info) => console.log(...)` |
-| `onSave`                | `(info: DataChangeInfo) => void`         | 当用户点击工具栏中的“保存”按钮时触发的回调函数。**这是实现保存逻辑的主要入口。**                                                                                                                                                                                      | `(info) => console.log(...)` |
+| `onSave`                | `(info: DataChangeInfo) => void`         | 当用户点击工具栏中的“保存”按钮，或**自动保存**触发时调用的回调函数。`info.operationType` 为 `SAVE`。                                                                                                                                                                                      | `(info) => console.log(...)` |
 | `onExecuteUseCase`      | `(info: DataChangeInfo) => void`         | 当用户通过上下文菜单或 API 执行用例时触发的回调函数。                                                                                                                                                                                                                 | `(info) => console.log(...)` |
 | `onSubmitDefect`        | `(info: DataChangeInfo) => void`         | 当用户通过上下文菜单或 API 提交缺陷时触发的回调函数。                                                                                                                                                                                                                 | `(info) => console.log(...)` |
 | `onConfirmReviewStatus` | `(info: DataChangeInfo) => void`         | 当用户在评审弹窗中点击“确定”后触发。`info` 对象包含了此次变更的完整上下文。                                                                                                                                                                                           | `(info) => console.log(...)` |
 | `onConfirmRemark`       | `(info: DataChangeInfo) => void`         | 当用户在备注弹窗中添加新备注后触发。                                                                                                                                                                                                                                  | `(info) => console.log(...)` |
 | `onConfirmScore`        | `(info: DataChangeInfo) => void`         | 当用户在评分弹窗中提交评分后触发。                                                                                                                                                                                                                                    | `(info) => console.log(...)` |
+| `onReadOnlyChange`      | `(isReadOnly: boolean) => void`          | 当思维导图的只读/编辑模式状态发生变更时触发的回调。                                                                                                                                                                                                                   | `undefined`                  |
 | `getNodeBackgroundColor`| `(node: MindMapNodeData) => string`      | 一个回调函数，接收每个节点的数据并返回一个 CSS 颜色字符串作为节点背景色。                                                                                                                                                                                             | `undefined`                  |
 
-#### 功能开关
+#### 功能配置与开关
 
 | Prop 名称                         | 类型                                     | 描述                                                                                                                                                             | 默认值                                                   |
 | --------------------------------- | ---------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
+| `enableAutoSave`                  | `boolean`                                | 是否开启自动保存功能。开启后，用户停止操作达到 `autoSaveDelay` 时会自动触发 `onSave` 回调。                                                                       | `false`                                                  |
+| `autoSaveDelay`                   | `number`                                 | 自动保存的防抖延迟时间（毫秒）。                                                                                                                                 | `1000`                                                   |
+| `enableSaveValidation`            | `boolean`                                | 是否在触发保存（手动或自动）前进行数据校验。如果校验失败，将显示 Toast 提示并拦截 `onSave` 回调。                                                                   | `true`                                                   |
+| `validationConfig`                | `ValidationConfig`                       | 具体的校验规则配置。例如：`{ requirePriority: true, requirePrecondition: true }`。                                                                               | `{ requirePriority: true, requirePrecondition: true }`   |
 | `isDraggable`                     | `boolean`                                | 是否允许用户通过拖拽自由移动节点位置（不改变父子关系）。                                                                                                         | `false`                                                  |
 | `enableStrictDrag`                | `boolean`                                | 是否启用结构化拖拽模式，允许节点根据规则重新父级化。                                                                                                             | `true`                                                   |
 | `enableNodeReorder`               | `boolean`                                | 是否允许通过拖拽来对同级节点进行排序。                                                                                                                           | `true`                                                   |
+| `enableRangeSelection`            | `boolean`                                | 是否允许在编辑模式下通过 Shift+拖拽 进行框选。                                                                                                                   | `true`                                                   |
+| `enableNodeCopy`                  | `boolean`                                | 是否允许在编辑模式下复制节点（支持 `Ctrl+C` 快捷键和右键菜单）。                                                                                                 | `true`                                                   |
 | `reorderableNodeTypes`            | `NodeType[]`                             | 定义了哪些节点类型可以被拖拽挂载和排序。                                                                                                                         | `['MODULE', 'TEST_POINT', 'USE_CASE', 'STEP']`           |
 | `enableUseCaseExecution`          | `boolean`                                | 是否启用“执行用例”功能。                                                                                                                                         | `true`                                                   |
 | `enableDefectSubmission`          | `boolean`                                | 是否启用“提交缺陷”功能。                                                                                                                                         | `true`                                                   |
@@ -235,7 +289,7 @@ root.render(<ComprehensiveExample />);
 | `nodeScoringNodeTypes`            | `NodeType[]`                             | 一个节点类型数组，用于指定哪些节点应显示评分。                                                                                                                   | `['MODULE', 'TEST_POINT', 'USE_CASE']`                   |
 | `enableBulkReviewContextMenu`     | `boolean`                                | 是否在 `DEMAND`, `MODULE`, `TEST_POINT` 节点的右键菜单中显示“一键评审用例”选项。                                                                                 | `true`                                                   |
 | `enableSingleReviewContextMenu`   | `boolean`                                | 是否在 `USE_CASE` 节点的右键菜单中显示“评审用例”选项。                                                                                                           | `true`                                                   |
-| `strictMode`                      | `boolean`                                | 是否启用严格模式，强制执行节点层级规则。                                                                                                                         | `true`                                                   |
+| `strictMode`                      | `boolean`                                | 是否启用严格模式，强制执行节点层级规则（粘贴、拖拽等）。                                                                                                          | `true`                                                   |
 | `priorityEditableNodeTypes`       | `NodeType[]`                             | 定义了哪些节点类型可以编辑其优先级。                                                                                                                             | `['MODULE', 'TEST_POINT', 'USE_CASE', 'GENERAL']`        |
 
 #### UI 自定义
@@ -257,6 +311,19 @@ root.render(<ComprehensiveExample />);
 | `bottomToolbarCommands`     | `CommandId[]`                            | 自定义底部工具栏中显示的按钮及其顺序。                                                                                                                           | `['zoomOut', 'zoomDisplay', ..., 'closeBottom']`           |
 | `showContextMenu`           | `boolean`                                | 是否显示节点的右键上下文菜单。                                                                                                                                   | `true`                                                     |
 | `showCanvasContextMenu`     | `boolean`                                | 是否显示画布的右键上下文菜单。                                                                                                                                   | `true`                                                     |
+
+---
+
+### 严格模式粘贴规则 (`strictMode: true`)
+
+当开启严格模式时，**复制粘贴**和**节点拖拽**操作将受到以下层级规则的限制。如果不符合规则，操作将被拦截并显示错误提示：
+
+1.  **模块 (`MODULE`)** 只能粘贴到 **需求 (`DEMAND`)** 节点下。
+2.  **测试点 (`TEST_POINT`)** 只能粘贴到 **模块 (`MODULE`)** 节点下。
+3.  **用例 (`USE_CASE`)** 只能粘贴到 **测试点 (`TEST_POINT`)** 节点下。
+4.  **前置条件 (`PRECONDITION`)** 只能粘贴到 **用例 (`USE_CASE`)** 节点下，且一个用例只能有一个前置条件。
+5.  **步骤 (`STEP`)** 只能粘贴到 **用例 (`USE_CASE`)** 节点下。
+6.  **预期结果 (`EXPECTED_RESULT`)** 只能粘贴到 **步骤 (`STEP`)** 节点下，且一个步骤只能有一个预期结果。
 
 ---
 
@@ -319,6 +386,19 @@ export interface AppRef {
     -   **作用**: **局部增量更新**指定节点的数据，而**不会触发界面重绘或创建撤销/重做历史记录**。它会直接合并 `partialData` 到现有节点数据中。
     -   **用途**: **核心用途**是从后端同步数据（如数据库 `id`）回写到节点中，而不会干扰用户的当前操作。例如，在用户评分后，API 返回了该评分记录的 `id`，可以使用此方法将其无缝地更新到节点的 `scoreInfo` 对象中。
     -   **注意**: 尽管此更新是“静默的”（无重绘、无历史记录），但它**仍然会触发 `onDataChange` 回调**，`operationType` 为 `PARTIAL_UPDATE_NODE`。
+
+-   **`getReviewStatusUpdateInfo(nodeUuid, newStatus): DataChangeInfo | null`**
+    -   **作用**: 获取假如将节点评审状态更新为 `newStatus` 时，会产生的变更信息（包含受影响的祖先节点聚合状态）。
+    -   **用途**: 在真正执行更新前，预览或获取需要发送给后端的所有受影响节点数据。此方法**不**会修改导图状态。
+
+-   **`confirmReviewStatus(nodeUuid, newStatus)`**
+    -   **作用**: 编程式地更新节点的评审状态。会自动处理状态的向上聚合逻辑。
+
+-   **`confirmRemark(nodeUuid, content)`**
+    -   **作用**: 编程式地为节点添加一条备注。
+
+-   **`confirmScore(nodeUuid, scoreInfo)`**
+    -   **作用**: 编程式地更新节点的评分信息。
 
 ---
 
@@ -610,3 +690,26 @@ interface RawNode {
 
 **底部工具栏可用命令:**
 `'zoomOut'`, `'zoomIn'`, `'zoomDisplay'`, `'separator'`, `'toggleReadOnly'`, `'fitView'`, `'centerView'`, `'layout'`, `'fullscreen'`, `'search'`, `'closeBottom'`
+
+## 默认快捷键
+
+以下是组件支持的默认键盘快捷键。您也可以在界面右上角点击“快捷键”按钮查看。
+
+| 功能 | Windows | macOS |
+| :--- | :--- | :--- |
+| **添加子节点** | `Tab` | `Tab` |
+| **添加同级节点** | `Enter` | `Enter` |
+| **删除节点** | `Delete` / `Backspace` | `Delete` / `Backspace` |
+| **展开/收起节点** | `Space` | `Space` |
+| **移动画布** | `←` `↑` `→` `↓` | `←` `↑` `→` `↓` |
+| **撤销** | `Ctrl` + `Z` | `⌘` + `Z` |
+| **重做** | `Ctrl` + `Y` / `Ctrl` + `Shift` + `Z` | `⌘` + `Y` / `⌘` + `Shift` + `Z` |
+| **保存** | `Ctrl` + `S` | `⌘` + `S` |
+| **搜索** | `Ctrl` + `F` | `⌘` + `F` |
+| **放大/缩小** | `Ctrl` + `+` / `-` | `⌘` + `+` / `-` |
+| **适应视图** | `Shift` + `F` | `Shift` + `F` |
+| **视图居中** | `Shift` + `C` | `Shift` + `C` |
+| **只读模式** | `Shift` + `R` | `Shift` + `R` |
+| **编辑模式** | `Shift` + `W` | `Shift` + `W` |
+| **复制** | `Ctrl` + `C` | `⌘` + `C` |
+| **粘贴** | `Ctrl` + `V` | `⌘` + `V` |

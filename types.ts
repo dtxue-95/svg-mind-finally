@@ -178,6 +178,7 @@ export enum OperationType {
   UPDATE_SCORE_INFO = 'UPDATE_SCORE_INFO',
   PARTIAL_UPDATE_NODE = 'PARTIAL_UPDATE_NODE',
   SYNC_DATA = 'SYNC_DATA',
+  PASTE_NODES = 'PASTE_NODES',
 }
 
 // New types for the data sent in the callback, using raw keys
@@ -259,4 +260,13 @@ export interface ValidationConfig {
     requirePriority?: boolean;
     requirePrecondition?: boolean;
     requireStep?: boolean;
+}
+
+export interface SelectionBox {
+    startX: number;
+    startY: number;
+    currentX: number;
+    currentY: number;
+    width: number;
+    height: number;
 }

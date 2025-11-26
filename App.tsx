@@ -1,4 +1,3 @@
-
 import React, { useImperativeHandle, forwardRef, useCallback, useState, useEffect, useMemo, useRef } from 'react';
 import { useMindMap } from './hooks/useMindMap';
 import { MindMapCanvas } from './components/MindMapCanvas';
@@ -18,7 +17,7 @@ export { OperationType };
 
 const defaultTopCommands: CommandId[] = ['undo', 'redo', 'separator', 'addSibling', 'addChild', 'delete', 'save', 'closeTop'];
 const defaultBottomCommands: CommandId[] = ['zoomOut', 'zoomDisplay', 'zoomIn', 'separator', 'toggleReadOnly', 'fitView', 'centerView', 'layout', 'fullscreen', 'search', 'closeBottom'];
-const defaultPriorityEditableNodeTypes: NodeType[] = ['MODULE', 'TEST_POINT', 'USE_CASE', 'GENERAL'];
+const defaultPriorityEditableNodeTypes: NodeType[] = ['USE_CASE'];
 const defaultReorderableNodeTypes: NodeType[] = ['MODULE', 'TEST_POINT', 'USE_CASE', 'STEP'];
 const defaultReviewableNodeTypes: NodeType[] = ['DEMAND', 'MODULE', 'TEST_POINT', 'USE_CASE'];
 const defaultNodeRemarksNodeTypes: NodeType[] = ['MODULE', 'TEST_POINT', 'USE_CASE'];
@@ -88,6 +87,8 @@ interface AppProps {
     autoSaveDelay?: number;
     enableSaveValidation?: boolean;
     validationConfig?: ValidationConfig;
+    enableRangeSelection?: boolean;
+    enableNodeCopy?: boolean;
     children?: React.ReactNode;
 }
 
@@ -139,6 +140,8 @@ const App = forwardRef<AppRef, AppProps>(({
     autoSaveDelay = 1000,
     enableSaveValidation = true,
     validationConfig = { requirePriority: true, requirePrecondition: true, requireStep: true },
+    enableRangeSelection = true,
+    enableNodeCopy = true,
     children,
 }, ref) => {
     // State to hold the data for the mind map. Initialized from props.
@@ -281,6 +284,7 @@ const App = forwardRef<AppRef, AppProps>(({
         confirmScore,
         partialUpdateNode,
         syncData,
+        pasteNodes,
         undo,
         redo,
         canUndo,
@@ -523,6 +527,9 @@ const App = forwardRef<AppRef, AppProps>(({
                 connectorStyle={connectorStyle}
                 toast={toast}
                 onCloseToast={handleCloseToast}
+                enableRangeSelection={enableRangeSelection}
+                onPasteNodes={pasteNodes}
+                enableNodeCopy={enableNodeCopy}
             >
                 {children}
             </MindMapCanvas>

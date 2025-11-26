@@ -465,9 +465,9 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
     const performPaste = useCallback((targetNodeUuid: string) => {
         if (!isReadOnly && clipboardRef.current.length > 0 && onPasteNodes) {
             onPasteNodes(targetNodeUuid, clipboardRef.current);
-            // Clear clipboard after paste as requested
-            clipboardRef.current = [];
-            setClipboardSize(0);
+            // We do not clear the clipboard here anymore.
+            // This allows users to retry pasting if the first attempt failed due to validation constraints,
+            // and supports the standard behavior of multiple pastes from a single copy.
         }
     }, [isReadOnly, onPasteNodes]);
 

@@ -1,3 +1,4 @@
+
 import React, { useCallback, useRef, useEffect, useReducer, useMemo, useState } from 'react';
 import type { MindMapData, CommandId, MindMapNodeData, NodeType, NodePriority, DataChangeCallback, CanvasTransform, ReviewStatusCode, ScoreInfo, ConnectorStyle } from '../types';
 import { MindMapNode } from './MindMapNode';
@@ -155,7 +156,7 @@ interface MindMapCanvasProps {
     toast?: { visible: boolean; message: string; type: 'error' | 'success' };
     onCloseToast?: () => void;
     enableRangeSelection?: boolean;
-    onPasteNodes?: (targetParentUuid: string, sourceNodeUuids: string[]) => void;
+    onPasteNodes?: (targetParentUuid: string, sourceNodeUuids: string[]) => string[] | undefined;
     enableNodeCopy?: boolean;
 }
 
@@ -197,6 +198,7 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
     // Internal clipboard to store UUIDs of nodes to copy
     const clipboardRef = useRef<string[]>([]);
     const [clipboardSize, setClipboardSize] = useState(0);
+    const [pastedNodeUuids, setPastedNodeUuids] = useState<string[] | null>(null);
 
     const [isShortcutsPanelVisible, setIsShortcutsPanelVisible] = useState(false);
     const [shortcutsPanelPosition, setShortcutsPanelPosition] = useState<{top: number; right: number}>({ top: 0, right: 0 });
@@ -371,6 +373,50 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
         }
     }, [newlyAddedNodeUuid, mindMapData, onNodeFocused, transform.scale, dispatch, onExpandNodes]);
 
+    // Effect to focus and center on newly pasted nodes
+    useEffect(() => {
+        if (pastedNodeUuids && pastedNodeUuids.length > 0 && canvasRef.current) {
+            // Check if all pasted nodes are present in the mind map data
+            const allNodesExist = pastedNodeUuids.every(uuid => mindMapData.nodes[uuid]);
+            
+            if (allNodesExist) {
+                // 1. Multi-select all pasted nodes
+                dispatch({ type: 'SET_MULTI_SELECTION', payload: { nodeUuids: new Set(pastedNodeUuids) } });
+                // Optionally set the first one as the primary selection
+                dispatch({ type: 'SELECT_NODE', payload: { nodeUuid: pastedNodeUuids[0] } });
+
+                // 2. Calculate the bounding box of all pasted nodes to center the view
+                let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+                
+                pastedNodeUuids.forEach(uuid => {
+                    const node = mindMapData.nodes[uuid];
+                    if (node && node.position && node.width && node.height) {
+                        minX = Math.min(minX, node.position.x);
+                        minY = Math.min(minY, node.position.y);
+                        maxX = Math.max(maxX, node.position.x + node.width);
+                        maxY = Math.max(maxY, node.position.y + node.height);
+                    }
+                });
+
+                if (minX !== Infinity) {
+                    const centerX = minX + (maxX - minX) / 2;
+                    const centerY = minY + (maxY - minY) / 2;
+                    
+                    const canvasRect = canvasRef.current.getBoundingClientRect();
+                    
+                    // Calculate new translation to center the bounding box
+                    const newTranslateX = canvasRect.width / 2 - centerX * transform.scale;
+                    const newTranslateY = canvasRect.height / 2 - centerY * transform.scale;
+
+                    dispatch({ type: 'SET_TRANSFORM', payload: { translateX: newTranslateX, translateY: newTranslateY } });
+                }
+
+                // Reset the pasted nodes state to avoid re-running
+                setPastedNodeUuids(null);
+            }
+        }
+    }, [pastedNodeUuids, mindMapData, transform.scale]);
+
 
     // Effect to expand ancestors when search results change
     useEffect(() => {
@@ -464,7 +510,11 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
 
     const performPaste = useCallback((targetNodeUuid: string) => {
         if (!isReadOnly && clipboardRef.current.length > 0 && onPasteNodes) {
-            onPasteNodes(targetNodeUuid, clipboardRef.current);
+            const newUuids = onPasteNodes(targetNodeUuid, clipboardRef.current);
+            // If paste was successful and returned new node UUIDs, store them to trigger the centering effect
+            if (newUuids && newUuids.length > 0) {
+                setPastedNodeUuids(newUuids);
+            }
             // We do not clear the clipboard here anymore.
             // This allows users to retry pasting if the first attempt failed due to validation constraints,
             // and supports the standard behavior of multiple pastes from a single copy.

@@ -819,7 +819,7 @@ export const useMindMap = (
         }
     }, [dispatch]);
 
-    const pasteNodes = useCallback((targetParentUuid: string, sourceNodeUuids: string[]) => {
+    const pasteNodes = useCallback((targetParentUuid: string, sourceNodeUuids: string[]): string[] | undefined => {
         const currentMindMap = mindMapRef.current;
         const targetParent = currentMindMap.nodes[targetParentUuid];
         
@@ -902,9 +902,15 @@ export const useMindMap = (
 
         if (nodesToPaste.length === 0) return;
 
+        const prePasteParent = currentMindMap.nodes[targetParentUuid];
+        const prePasteChildren = new Set(prePasteParent?.childNodeList || []);
+
         const action: MindMapAction = { type: 'PASTE_NODES', payload: { targetParentUuid, sourceNodeUuids: nodesToPaste } };
         const nextState = mindMapReducer(currentMindMap, action);
         const laidOutMap = autoLayout(nextState);
+
+        const postPasteParent = laidOutMap.nodes[targetParentUuid];
+        const addedChildUuids = (postPasteParent?.childNodeList || []).filter(uuid => !prePasteChildren.has(uuid));
 
         if (onDataChangeRef.current) {
             const info = {
@@ -913,12 +919,14 @@ export const useMindMap = (
                 description: `Pasted ${nodesToPaste.length} nodes into '${targetParent.name}'`,
                 previousData: currentMindMap,
                 currentData: laidOutMap,
-                affectedNodeUuids: [targetParentUuid, ...nodesToPaste], // Simplification
+                affectedNodeUuids: [targetParentUuid, ...addedChildUuids],
             };
             onDataChangeRef.current(convertDataChangeInfo(info));
         }
 
         dispatch({ type: 'SET_MIND_MAP', payload: laidOutMap });
+        
+        return addedChildUuids;
     }, [dispatch, strictMode, onError]);
 
 

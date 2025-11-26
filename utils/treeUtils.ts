@@ -1,5 +1,6 @@
 
 import type { MindMapData, MindMapNodeData } from '../types';
+import { MIN_NODE_HEIGHT, MIN_NODE_WIDTH } from '../constants';
 
 /**
  * Deeply clones a node and all its descendants, generating new UUIDs for each.
@@ -36,9 +37,12 @@ export const cloneNodeTree = (
             nodeType: originalNode.nodeType,
             priorityLevel: originalNode.priorityLevel,
             
-            // 3. Layout (Preserved dimensions to avoid layout jumps, reset position)
-            width: originalNode.width,
-            height: originalNode.height,
+            // 3. Layout (Reset to default minimums to allow re-measurement)
+            // We do NOT copy originalNode.width/height because the original might include 
+            // space for icons (review, score, etc.) that are being stripped in this clone.
+            // Resetting ensures the new node measures itself based purely on its text content.
+            width: MIN_NODE_WIDTH,
+            height: MIN_NODE_HEIGHT,
             position: { x: 0, y: 0 }, // Position will be set by autoLayout
 
             // 4. State (Reset to defaults)

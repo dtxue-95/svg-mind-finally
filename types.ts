@@ -3,6 +3,7 @@
 export type NodeType = 'DEMAND' | 'MODULE' | 'TEST_POINT' | 'USE_CASE' | 'STEP' | 'PRECONDITION' | 'EXPECTED_RESULT' | 'GENERAL';
 export type NodePriority = 'P0' | 'P1' | 'P2' | 'P3' | null;
 export type ConnectorStyle = 'elbow' | 'curve';
+export type InteractionMode = 'zoom' | 'scroll';
 
 export interface CanvasTransform {
     scale: number;
@@ -145,6 +146,7 @@ export type CommandId =
   | 'zoomOut'
   | 'zoomIn'
   | 'zoomDisplay'
+  | 'switchInteractionMode'
   | 'toggleReadOnly'
   | 'fitView'
   | 'centerView'

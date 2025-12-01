@@ -1,6 +1,10 @@
 
+
+
+
+
 import React, { useCallback, useRef, useEffect, useReducer, useMemo, useState } from 'react';
-import type { MindMapData, CommandId, MindMapNodeData, NodeType, NodePriority, DataChangeCallback, CanvasTransform, ReviewStatusCode, ScoreInfo, ConnectorStyle } from '../types';
+import type { MindMapData, CommandId, MindMapNodeData, NodeType, NodePriority, DataChangeCallback, CanvasTransform, ReviewStatusCode, ScoreInfo, ConnectorStyle, InteractionMode } from '../types';
 import { MindMapNode } from './MindMapNode';
 import { Toolbar } from './Toolbar';
 import { BottomToolbar } from './BottomToolbar';
@@ -158,6 +162,9 @@ interface MindMapCanvasProps {
     enableRangeSelection?: boolean;
     onPasteNodes?: (targetParentUuid: string, sourceNodeUuids: string[]) => string[] | undefined;
     enableNodeCopy?: boolean;
+    interactionMode: InteractionMode;
+    onSetInteractionMode: (mode: InteractionMode) => void;
+    enableInteractionModeSwitch: boolean;
 }
 
 const SvgPath = React.memo(({ d, className }: { d: string, className: string }) => {
@@ -175,7 +182,7 @@ const AUTO_PAN_SPEED = 10;
 
 export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
     mindMapData, onAddChildNode, onAddSiblingNode, onDeleteNode, onFinishEditing, onUpdateNodePosition, onReparentNode, onReorderNode, onLayout, onUpdateNodeSize, onSave, showAITag, isDraggable = false, enableStrictDrag = false, enableNodeReorder = true, reorderableNodeTypes, showNodeType, showPriority, onToggleCollapse, onExpandNodes, onExpandAllNodes, onCollapseAllNodes, onExpandToLevel, onCollapseToLevel, onUpdateNodeType, onUpdateNodePriority, onConfirmReviewStatus, onConfirmRemark, onConfirmScore, onSubmitDefect,
-    onUndo, onRedo, canUndo, canRedo, showTopToolbar, showBottomToolbar, topToolbarCommands, bottomToolbarCommands, strictMode = false, showContextMenu = true, showCanvasContextMenu = true, priorityEditableNodeTypes, onDataChange, onExecuteUseCase, enableUseCaseExecution, enableDefectSubmission, canvasBackgroundColor, showBackgroundDots, showMinimap, getNodeBackgroundColor, enableReadOnlyUseCaseExecution, enableExpandCollapseByLevel, isReadOnly, onToggleReadOnly, onSetReadOnly, isDirty, children, newlyAddedNodeUuid, onNodeFocused, showReadOnlyToggleButtons, showShortcutsButton, enableReviewStatus, enableNodeRemarks, enableNodeScoring, reviewStatusNodeTypes, nodeRemarksNodeTypes, nodeScoringNodeTypes, enableBulkReviewContextMenu, enableSingleReviewContextMenu, connectorStyle, toast, onCloseToast, enableRangeSelection, onPasteNodes, enableNodeCopy = true
+    onUndo, onRedo, canUndo, canRedo, showTopToolbar, showBottomToolbar, topToolbarCommands, bottomToolbarCommands, strictMode = false, showContextMenu = true, showCanvasContextMenu = true, priorityEditableNodeTypes, onDataChange, onExecuteUseCase, enableUseCaseExecution, enableDefectSubmission, canvasBackgroundColor, showBackgroundDots, showMinimap, getNodeBackgroundColor, enableReadOnlyUseCaseExecution, enableExpandCollapseByLevel, isReadOnly, onToggleReadOnly, onSetReadOnly, isDirty, children, newlyAddedNodeUuid, onNodeFocused, showReadOnlyToggleButtons, showShortcutsButton, enableReviewStatus, enableNodeRemarks, enableNodeScoring, reviewStatusNodeTypes, nodeRemarksNodeTypes, nodeScoringNodeTypes, enableBulkReviewContextMenu, enableSingleReviewContextMenu, connectorStyle, toast, onCloseToast, enableRangeSelection, onPasteNodes, enableNodeCopy = true, interactionMode, onSetInteractionMode, enableInteractionModeSwitch
 }) => {
     const [canvasState, dispatch] = useReducer(canvasReducer, {
         rootUuid: mindMapData.rootUuid,
@@ -872,23 +879,54 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
         handleCloseCanvasContextMenu();
         if (!canvasRef.current) return;
 
-        if (dragState) {
+        if (interactionMode === 'scroll') {
+            // Scroll Mode: Wheel moves the canvas (Pan)
+            // Use negative delta to create natural scrolling direction (scroll down -> move view down -> content moves up)
+            // Or standard paper-drag direction. 
+            // Standard scroll: Wheel Down (positive deltaY) moves viewport down.
+            // If viewport moves down, canvas contents (transform Y) move up (negative).
+            // So dy should be -deltaY.
             const panDx = -e.deltaX;
             const panDy = -e.deltaY;
 
-            dragStartPosRef.current.x += panDx;
-            dragStartPosRef.current.y += panDy;
+            if (dragState) {
+                // If dragging a node, update the drag start pos reference so the node stays under cursor visually
+                dragStartPosRef.current.x += panDx;
+                dragStartPosRef.current.y += panDy;
+            }
 
             dispatch({ type: 'PAN', payload: { dx: panDx, dy: panDy }});
+            
+            if (dragState) {
+                 // Immediate update for drag visual
+                 updateDrag();
+            }
+
         } else {
-            const sensitivity = 0.0025;
-            const scaleAmount = Math.pow(2, -e.deltaY * sensitivity);
+            // Zoom Mode (Default): Wheel zooms
+            if (dragState) {
+                // Allow panning while dragging even in zoom mode if needed, 
+                // but usually wheel zooms. 
+                // To keep consistent with existing behavior, dragging + wheel = pan logic from before?
+                // The previous code had `if (dragState) { ... PAN ... } else { ... ZOOM ... }`.
+                // We preserve that priority: if dragging, wheel always pans to help move nodes offscreen.
+                const panDx = -e.deltaX;
+                const panDy = -e.deltaY;
 
-            const rect = canvasRef.current.getBoundingClientRect();
-            const mouseX = e.clientX - rect.left;
-            const mouseY = e.clientY - rect.top;
+                dragStartPosRef.current.x += panDx;
+                dragStartPosRef.current.y += panDy;
 
-            dispatch({ type: 'ZOOM', payload: { scaleAmount, centerX: mouseX, centerY: mouseY } });
+                dispatch({ type: 'PAN', payload: { dx: panDx, dy: panDy }});
+            } else {
+                const sensitivity = 0.0025;
+                const scaleAmount = Math.pow(2, -e.deltaY * sensitivity);
+
+                const rect = canvasRef.current.getBoundingClientRect();
+                const mouseX = e.clientX - rect.left;
+                const mouseY = e.clientY - rect.top;
+
+                dispatch({ type: 'ZOOM', payload: { scaleAmount, centerX: mouseX, centerY: mouseY } });
+            }
         }
     };
 
@@ -1470,6 +1508,9 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
                         visibleNodeUuids={visibleNodeUuids}
                         isReadOnly={isReadOnly}
                         onToggleReadOnly={onToggleReadOnly}
+                        interactionMode={interactionMode}
+                        onToggleInteractionMode={() => onSetInteractionMode(interactionMode === 'zoom' ? 'scroll' : 'zoom')}
+                        enableInteractionModeSwitch={enableInteractionModeSwitch}
                     />
                 ) : (
                     <ToolbarHandle position="bottom" onClick={handleShowBottomToolbar} />

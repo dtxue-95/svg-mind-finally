@@ -1,7 +1,9 @@
+
+
 import React, { useImperativeHandle, forwardRef, useCallback, useState, useEffect, useMemo, useRef } from 'react';
 import { useMindMap } from './hooks/useMindMap';
 import { MindMapCanvas } from './components/MindMapCanvas';
-import type { RawNode, CommandId, NodeType, DataChangeCallback, DataChangeInfo, MindMapData, MindMapNodeData, ReviewStatusCode, ScoreInfo, ConnectorStyle, ValidationConfig } from './types';
+import type { RawNode, CommandId, NodeType, DataChangeCallback, DataChangeInfo, MindMapData, MindMapNodeData, ReviewStatusCode, ScoreInfo, ConnectorStyle, ValidationConfig, InteractionMode } from './types';
 import { OperationType } from './types';
 import { createInitialMindMap } from './utils/createInitialMindMap';
 import { convertDataChangeInfo } from './utils/callbackDataConverter';
@@ -11,12 +13,12 @@ import { validateMindMap } from './utils/validation';
 // Export Panel component and types for external use
 export { Panel } from './components/Panel';
 export type { PanelPosition } from './components/Panel';
-export type { RawNode, CommandId, NodeType, DataChangeCallback, DataChangeInfo, MindMapNodeData, ConnectorStyle };
+export type { RawNode, CommandId, NodeType, DataChangeCallback, DataChangeInfo, MindMapNodeData, ConnectorStyle, InteractionMode };
 export { OperationType };
 
 
 const defaultTopCommands: CommandId[] = ['undo', 'redo', 'separator', 'addSibling', 'addChild', 'delete', 'save', 'closeTop'];
-const defaultBottomCommands: CommandId[] = ['zoomOut', 'zoomDisplay', 'zoomIn', 'separator', 'toggleReadOnly', 'fitView', 'centerView', 'layout', 'fullscreen', 'search', 'closeBottom'];
+const defaultBottomCommands: CommandId[] = ['zoomOut', 'zoomDisplay', 'zoomIn', 'switchInteractionMode', 'separator', 'toggleReadOnly', 'fitView', 'centerView', 'layout', 'fullscreen', 'search', 'closeBottom'];
 const defaultPriorityEditableNodeTypes: NodeType[] = ['USE_CASE'];
 const defaultReorderableNodeTypes: NodeType[] = ['MODULE', 'TEST_POINT', 'USE_CASE', 'STEP'];
 const defaultReviewableNodeTypes: NodeType[] = ['DEMAND', 'MODULE', 'TEST_POINT', 'USE_CASE'];
@@ -89,6 +91,9 @@ interface AppProps {
     validationConfig?: ValidationConfig;
     enableRangeSelection?: boolean;
     enableNodeCopy?: boolean;
+    enableInteractionModeSwitch?: boolean;
+    interactionMode?: InteractionMode;
+    onInteractionModeChange?: (mode: InteractionMode) => void;
     children?: React.ReactNode;
 }
 
@@ -142,13 +147,31 @@ const App = forwardRef<AppRef, AppProps>(({
     validationConfig = { requirePriority: true, requirePrecondition: true, requireStep: true },
     enableRangeSelection = true,
     enableNodeCopy = true,
+    enableInteractionModeSwitch = true,
+    interactionMode: interactionModeProp,
+    onInteractionModeChange,
     children,
 }, ref) => {
     // State to hold the data for the mind map. Initialized from props.
     const [currentData, setCurrentData] = useState<RawNode>(initialData);
     const [isReadOnly, setIsReadOnly] = useState(true);
+    
+    // Internal state for interaction mode, acting as fallback if prop is not provided
+    const [internalInteractionMode, setInternalInteractionMode] = useState<InteractionMode>('zoom');
+    
+    // Derived state: prefer prop if available, otherwise use internal state
+    const interactionMode = interactionModeProp !== undefined ? interactionModeProp : internalInteractionMode;
+
     const [newlyAddedNodeUuid, setNewlyAddedNodeUuid] = useState<string | null>(null);
     const [toast, setToast] = useState<{ visible: boolean; message: string; type: 'error' | 'success' }>({ visible: false, message: '', type: 'error' });
+
+    // Handle interaction mode change (supports both controlled and uncontrolled)
+    const handleSetInteractionMode = useCallback((mode: InteractionMode) => {
+        setInternalInteractionMode(mode);
+        if (onInteractionModeChange) {
+            onInteractionModeChange(mode);
+        }
+    }, [onInteractionModeChange]);
 
     // Effect to update the internal state when the initialData prop changes.
     // This allows the mind map to update when data is loaded asynchronously.
@@ -530,6 +553,9 @@ const App = forwardRef<AppRef, AppProps>(({
                 enableRangeSelection={enableRangeSelection}
                 onPasteNodes={pasteNodes}
                 enableNodeCopy={enableNodeCopy}
+                interactionMode={interactionMode}
+                onSetInteractionMode={handleSetInteractionMode}
+                enableInteractionModeSwitch={enableInteractionModeSwitch}
             >
                 {children}
             </MindMapCanvas>

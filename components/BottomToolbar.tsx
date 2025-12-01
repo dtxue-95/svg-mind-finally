@@ -1,8 +1,10 @@
+
+
 import React from 'react';
 import { FiSearch, FiLayout } from 'react-icons/fi';
 import type { CanvasAction } from '../state/canvasReducer';
 import type { CanvasState } from '../state/canvasState';
-import type { MindMapData, CommandId } from '../types';
+import type { MindMapData, CommandId, InteractionMode } from '../types';
 import { ZoomInCommand } from './commands/ZoomInCommand';
 import { ZoomOutCommand } from './commands/ZoomOutCommand';
 import { FitViewCommand } from './commands/FitViewCommand';
@@ -10,6 +12,7 @@ import { CenterViewCommand } from './commands/CenterViewCommand';
 import { ToggleReadOnlyCommand } from './commands/ToggleReadOnlyCommand';
 import { CloseToolbarCommand } from './commands/CloseToolbarCommand';
 import { FullscreenCommand } from './commands/FullscreenCommand';
+import { SwitchInteractionModeCommand } from './commands/SwitchInteractionModeCommand';
 
 interface BottomToolbarProps {
     dispatch: React.Dispatch<CanvasAction>;
@@ -21,6 +24,9 @@ interface BottomToolbarProps {
     visibleNodeUuids: Set<string>;
     isReadOnly: boolean;
     onToggleReadOnly: () => void;
+    interactionMode: InteractionMode;
+    onToggleInteractionMode: () => void;
+    enableInteractionModeSwitch: boolean;
 }
 
 export const BottomToolbar: React.FC<BottomToolbarProps> = ({
@@ -33,6 +39,9 @@ export const BottomToolbar: React.FC<BottomToolbarProps> = ({
     visibleNodeUuids,
     isReadOnly,
     onToggleReadOnly,
+    interactionMode,
+    onToggleInteractionMode,
+    enableInteractionModeSwitch,
 }) => {
     const { transform, selectedNodeUuid, isSearchActive } = canvasState;
 
@@ -55,6 +64,14 @@ export const BottomToolbar: React.FC<BottomToolbarProps> = ({
                 );
             case 'zoomIn':
                 return <ZoomInCommand key={`${commandId}-${index}`} dispatch={dispatch} canvasRef={canvasRef} currentScale={transform.scale} />;
+            case 'switchInteractionMode':
+                return enableInteractionModeSwitch ? (
+                    <SwitchInteractionModeCommand 
+                        key={`${commandId}-${index}`} 
+                        mode={interactionMode} 
+                        onToggle={onToggleInteractionMode} 
+                    />
+                ) : null;
             case 'separator':
                 return <div key={`${commandId}-${index}`} className="bottom-toolbar__separator" />;
             case 'toggleReadOnly':

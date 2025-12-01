@@ -1,7 +1,8 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 import ReactDOM from 'react-dom/client';
-import App, { AppRef, DataChangeInfo, RawNode, OperationType } from './App';
+import App, { AppRef, DataChangeInfo, RawNode, OperationType, InteractionMode } from './App';
 import { mockInitialData } from './mockData';
+import { FiMousePointer, FiMove } from 'react-icons/fi';
 import './styles.css'
 
 // 模拟一个后端 API
@@ -36,6 +37,7 @@ function ComprehensiveExample() {
     const [lastSavedTime, setLastSavedTime] = useState<string>('-');
     const [isAutoSaveEnabled, setIsAutoSaveEnabled] = useState(false); // 默认关闭自动保存
     const [isReadOnly, setIsReadOnly] = useState(true); // 追踪 xmind 的只读状态
+    const [interactionMode, setInteractionMode] = useState<InteractionMode>('zoom'); // 交互模式：缩放/滚动
 
     // 统一的保存处理逻辑 (无论是自动保存触发还是手动按钮触发)
     const handleSave = useCallback(async (info: DataChangeInfo) => {
@@ -129,9 +131,48 @@ function ComprehensiveExample() {
                                 />
                                 <span style={{ fontWeight: 500 }}>自动保存</span>
                             </label>
+                            
                             <span style={{ color: '#ddd' }}>|</span>
                         </>
                     )}
+
+                    {/* 交互模式切换 (滚轮行为) - 在只读和编辑模式下均显示 */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px', background: '#f0f0f0', padding: '2px', borderRadius: '6px' }}>
+                        <button 
+                            onClick={() => setInteractionMode('zoom')}
+                            title="缩放模式：滚轮缩放画布"
+                            style={{
+                                border: 'none',
+                                background: interactionMode === 'zoom' ? '#fff' : 'transparent',
+                                color: interactionMode === 'zoom' ? '#007aff' : '#666',
+                                borderRadius: '4px',
+                                padding: '4px 8px',
+                                cursor: 'pointer',
+                                boxShadow: interactionMode === 'zoom' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+                                display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px'
+                            }}
+                        >
+                            <FiMousePointer size={14} /> 缩放
+                        </button>
+                        <button 
+                            onClick={() => setInteractionMode('scroll')}
+                            title="滚动模式：滚轮移动画布"
+                            style={{
+                                border: 'none',
+                                background: interactionMode === 'scroll' ? '#fff' : 'transparent',
+                                color: interactionMode === 'scroll' ? '#007aff' : '#666',
+                                borderRadius: '4px',
+                                padding: '4px 8px',
+                                cursor: 'pointer',
+                                boxShadow: interactionMode === 'scroll' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+                                display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px'
+                            }}
+                        >
+                            <FiMove size={14} /> 滚动
+                        </button>
+                    </div>
+                    
+                    <span style={{ color: '#ddd' }}>|</span>
                     
                     <span style={{ color: '#555' }}>{statusText}</span>
                 </div>
@@ -151,6 +192,13 @@ function ComprehensiveExample() {
                     
                     // 监听只读状态变化
                     onReadOnlyChange={handleReadOnlyChange}
+
+                    // 传递交互模式
+                    interactionMode={interactionMode}
+                    onInteractionModeChange={setInteractionMode}
+                    
+                    // 默认开启交互模式切换 (无需传参，默认即为 true)
+                    // enableInteractionModeSwitch={true}
 
                     // 当自动保存开启时，可以隐藏保存按钮，或者保留它作为“立即保存”
                     topToolbarCommands={['undo', 'redo', 'separator', 'addSibling', 'addChild', 'delete', 'save', 'closeTop']}

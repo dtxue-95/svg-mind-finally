@@ -216,6 +216,7 @@ foreignObject {
   transition: box-shadow 0.2s, transform 0.2s, border-color 0.2s, background-color 0.2s, outline 0.2s;
   outline: 2px solid transparent;
   outline-offset: 2px;
+  overflow: hidden; /* Clips the corner ribbon */
 }
 
 .mind-map-node:hover .mind-map-node__content {
@@ -256,30 +257,35 @@ foreignObject {
 /* New AI Tag Styles (Floating Badge/Pill) */
 .ai-ribbon-wrapper {
   position: absolute;
-  top: -8px;
-  left: -4px;
+  top: 0;
+  left: 0;
   z-index: 2;
-  width: auto;
-  height: auto;
-  transform: none; /* Remove previous rotation */
-  pointer-events: none; /* Let events pass through to node if needed, but text is usually fine */
+  pointer-events: none; /* Let clicks pass through to the node */
 }
 
 .ai-ribbon-main {
-    position: relative;
-    top: 0;
-    left: 0;
-    width: auto;
-    padding: 2px 8px;
-    border-radius: 12px;
-    display: flex;
-    justify-content: center;
-    align-items: center;
+    position: absolute;
+    top: 7px;
+    left: -28px;
+    width: 90px;
+    transform: rotate(-45deg);
+    text-align: center;
+    
+    padding: 2px 0;
+    
     color: white;
     font-weight: 600;
-    font-size: 10px;
+    font-size: 9px;
+    line-height: 1.2;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    
+    /* Truncation Logic */
     white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: block;
+    
+    pointer-events: auto; /* Enable pointer events on the tag itself for tooltip */
 }
 
 

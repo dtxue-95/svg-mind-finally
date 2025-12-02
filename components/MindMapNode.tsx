@@ -441,21 +441,22 @@ const MindMapNodeComponent: React.FC<MindMapNodeProps> = ({
             onContextMenu={handleContextMenu}
             data-node-uuid={node.uuid}
         >
-            {showAITag && generateModeConfig && (
-                <div className="ai-ribbon-wrapper">
-                    <div 
-                        className="ai-ribbon-main" 
-                        style={{ 
-                            backgroundColor: generateModeConfig.color, 
-                            color: generateModeConfig.textColor 
-                        }}
-                    >
-                        {node.generateModeName}
-                    </div>
-                </div>
-            )}
-            
             <div className="mind-map-node__content" ref={contentRef} style={contentStyle}>
+                {showAITag && generateModeConfig && (
+                    <div className="ai-ribbon-wrapper">
+                        <div 
+                            className="ai-ribbon-main" 
+                            style={{ 
+                                backgroundColor: generateModeConfig.color, 
+                                color: generateModeConfig.textColor 
+                            }}
+                            title={node.generateModeName}
+                        >
+                            {node.generateModeName}
+                        </div>
+                    </div>
+                )}
+
                 {showNodeType && node.nodeType !== 'GENERAL' && node.nodeType !== 'USE_CASE' && (
                     <span 
                         className="node-type-tag" 

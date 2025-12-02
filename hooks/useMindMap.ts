@@ -138,40 +138,15 @@ export const useMindMap = (
     }, [mindMap, dispatch]);
 
     const updateNodeSizeAndLayout = useCallback((nodeUuid: string, size: { width: number; height: number; }, options: { layout: boolean } = { layout: true }) => {
-        const currentMindMap = mindMapRef.current;
-        const node = currentMindMap.nodes[nodeUuid];
-        if (!node || (node.width === size.width && node.height === size.height)) {
-            return;
-        }
-
-        if (options.layout) {
-            const stateWithUpdatedSize = {
-                ...currentMindMap,
-                nodes: {
-                    ...currentMindMap.nodes,
-                    [nodeUuid]: { ...node, width: size.width, height: size.height },
-                },
-            };
-            // This is a "final" size update that requires a full layout.
-            const laidOutMap = autoLayout(stateWithUpdatedSize);
-            if (onDataChangeRef.current) {
-                const info = {
-                    operationType: OperationType.LAYOUT,
-                    timestamp: Date.now(),
-                    description: `Updated size for node '${node.name}' and re-laid out`,
-                    previousData: currentMindMap,
-                    currentData: laidOutMap,
-                    affectedNodeUuids: [nodeUuid],
-                    updatedNodes: [laidOutMap.nodes[nodeUuid]],
-                };
-                onDataChangeRef.current(convertDataChangeInfo(info));
-            }
-            dispatch({ type: 'UPDATE_PRESENT_STATE', payload: laidOutMap });
-        } else {
-            // This is a "temporary" size update (e.g., initial measure, live textarea resize).
-            // Just update the node size in the state without re-laying out the whole tree.
-            dispatch({ type: 'UPDATE_NODE_SIZE', payload: { nodeUuid, width: size.width, height: size.height } });
-        }
+        dispatch({ 
+            type: 'UPDATE_NODE_SIZE', 
+            payload: { 
+                nodeUuid, 
+                width: size.width, 
+                height: size.height,
+                shouldLayout: options.layout 
+            } 
+        });
     }, [dispatch]);
     
     const finishNodeEditing = useCallback((

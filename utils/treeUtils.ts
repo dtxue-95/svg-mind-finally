@@ -41,8 +41,8 @@ export const cloneNodeTree = (
             // We do NOT copy originalNode.width/height because the original might include 
             // space for icons (review, score, etc.) that are being stripped in this clone.
             // Resetting ensures the new node measures itself based purely on its text content.
-            width: MIN_NODE_WIDTH,
-            height: MIN_NODE_HEIGHT,
+            width: originalNode.width,
+            height: originalNode.height,
             position: { x: 0, y: 0 }, // Position will be set by autoLayout
 
             // 4. State (Reset to defaults)

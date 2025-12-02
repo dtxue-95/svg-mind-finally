@@ -1,5 +1,5 @@
 import type { MindMapData, MindMapNodeData } from '../types';
-import { HORIZONTAL_SPACING, VERTICAL_SPACING } from '../constants';
+import { HORIZONTAL_SPACING, VERTICAL_SPACING, MIN_NODE_WIDTH, MIN_NODE_HEIGHT } from '../constants';
 
 export const autoLayout = (currentMindMap: MindMapData): MindMapData => {
     const newPositions: { [key: string]: { x: number, y: number } } = {};
@@ -20,7 +20,8 @@ export const autoLayout = (currentMindMap: MindMapData): MindMapData => {
             const childrenHeights = children.map(child => {
                 if (!child || !child.uuid) return 0;
                 // The x position for a child is its parent's x + parent's width + spacing.
-                const childLayout = layoutBranch(child.uuid, x + (node.width ?? 0) + HORIZONTAL_SPACING, currentY);
+                const parentWidth = node.width ?? MIN_NODE_WIDTH;
+                const childLayout = layoutBranch(child.uuid, x + parentWidth + HORIZONTAL_SPACING, currentY);
                 currentY += childLayout.height + VERTICAL_SPACING;
                 return childLayout.height;
             });
@@ -28,7 +29,7 @@ export const autoLayout = (currentMindMap: MindMapData): MindMapData => {
             subtreeHeight = childrenHeights.reduce((a, b) => a + b, 0) + (children.length - 1) * VERTICAL_SPACING;
         }
 
-        const nodeHeight = node.height ?? 0;
+        const nodeHeight = node.height ?? MIN_NODE_HEIGHT;
         // The total height of the branch is the maximum of the node's own height or its subtree's height.
         const totalBranchHeight = Math.max(nodeHeight, subtreeHeight);
 

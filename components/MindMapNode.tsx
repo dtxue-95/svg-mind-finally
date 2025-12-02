@@ -95,6 +95,20 @@ const MindMapNodeComponent: React.FC<MindMapNodeProps> = ({
                 }
             }
 
+            // Enforce that NO children can shrink. This is crucial for preventing tags or text from being compressed.
+            Array.from(clone.children).forEach((child) => {
+                (child as HTMLElement).style.flexShrink = '0';
+            });
+
+            const textWrapperInClone = clone.querySelector('.mind-map-node__text-wrapper') as HTMLElement;
+            if (textWrapperInClone) {
+                // FORCE: disable flex shrinking and width constraints during measurement
+                // This ensures the wrapper expands to the full width of the text/content
+                textWrapperInClone.style.width = 'auto';
+                textWrapperInClone.style.minWidth = 'auto'; // Important override for flex items
+                textWrapperInClone.style.flex = 'none';
+            }
+
             const textElementInClone = clone.querySelector('.mind-map-node__text');
             if (!textElementInClone) return { width: node.width ?? MIN_NODE_WIDTH, height: node.height ?? MIN_NODE_HEIGHT };
     
@@ -103,18 +117,29 @@ const MindMapNodeComponent: React.FC<MindMapNodeProps> = ({
             clone.style.left = '-9999px';
             clone.style.top = '-9999px';
             clone.style.height = 'auto';
-            clone.style.width = 'auto'; // Let it expand freely first
+            // Use max-content to forcefully expand the container to the sum of its children's natural widths
+            clone.style.width = 'max-content'; 
+            clone.style.maxWidth = 'none'; // Ensure no max-width constrains it
+            clone.style.boxSizing = 'border-box';
             (textElementInClone as HTMLElement).style.whiteSpace = 'nowrap';
             
             document.body.appendChild(clone);
             
             // Measure natural width and apply constraints
-            const naturalWidth = Math.ceil(clone.getBoundingClientRect().width) + 2; // +2 buffer to prevent wrapping last character
+            // Increased buffer to +12px to ensure text never wraps unexpectedly across different browsers
+            const naturalWidth = Math.ceil(clone.getBoundingClientRect().width) + 12; 
             const finalWidth = Math.min(Math.max(naturalWidth, MIN_NODE_WIDTH), MAX_NODE_WIDTH);
             
             // Apply final width and measure height with wrapping
             clone.style.width = `${finalWidth}px`;
             (textElementInClone as HTMLElement).style.whiteSpace = 'normal';
+            // Restore wrapper styles to allow wrapping calculation
+            if (textWrapperInClone) {
+                textWrapperInClone.style.width = '';
+                textWrapperInClone.style.minWidth = '';
+                textWrapperInClone.style.flex = ''; 
+            }
+
             const finalHeight = Math.max(MIN_NODE_HEIGHT, clone.scrollHeight);
             
             document.body.removeChild(clone);
@@ -178,9 +203,11 @@ const MindMapNodeComponent: React.FC<MindMapNodeProps> = ({
     
     // Effect for auto-editing newly added nodes
     useEffect(() => {
-        if (isNewlyAdded && !isReadOnly) {
+        // Wait until dimensions are valid (numbers) before starting the edit.
+        // This ensures the canvas has had time to layout and center the node.
+        if (isNewlyAdded && !isReadOnly && typeof node.width === 'number' && typeof node.height === 'number') {
             isInitialEditRef.current = true; // Mark as initial edit
-            editingStartState.current = { name: node.name ?? '', width: node.width!, height: node.height! };
+            editingStartState.current = { name: node.name ?? '', width: node.width, height: node.height };
             setIsEditing(true);
             onNodeFocused(); // Notify parent that the node has been "focused"
         }
@@ -327,7 +354,8 @@ const MindMapNodeComponent: React.FC<MindMapNodeProps> = ({
     const case_props = STATUS_COLOR_PROPS[node.finalTestCaseStatusCode || 'default'] || STATUS_COLOR_PROPS.default;
 
     // --- Review Info Rendering ---
-    const shouldRenderReviewIcons = !!node.id;
+    // Only render the container if there is an ID AND at least one icon type is enabled.
+    const shouldRenderReviewIcons = !!node.id && (showReviewStatus || showRemarkIcon || showScoreInfo);
 
     const handleReviewIconClick = (e: React.MouseEvent) => {
         e.stopPropagation(); // Prevent node selection

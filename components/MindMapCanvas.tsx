@@ -1,8 +1,3 @@
-
-
-
-
-
 import React, { useCallback, useRef, useEffect, useReducer, useMemo, useState } from 'react';
 import type { MindMapData, CommandId, MindMapNodeData, NodeType, NodePriority, DataChangeCallback, CanvasTransform, ReviewStatusCode, ScoreInfo, ConnectorStyle, InteractionMode } from '../types';
 import { MindMapNode } from './MindMapNode';
@@ -345,7 +340,13 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
     useEffect(() => {
         // Check if there's a node to focus on, if it exists in the current data, and if the canvas is ready.
         if (newlyAddedNodeUuid && mindMapData.nodes[newlyAddedNodeUuid] && canvasRef.current) {
+            const node = mindMapData.nodes[newlyAddedNodeUuid];
             
+            // Wait for node measurement to complete (width/height are defined) before centering.
+            if (typeof node.width !== 'number' || typeof node.height !== 'number') {
+                return;
+            }
+
             // Expand ancestors if they are collapsed to make the new node visible
             const ancestors = findAllAncestorUuids(mindMapData, newlyAddedNodeUuid);
             // FIX: Add explicit type for `node` to resolve 'property does not exist on type 'unknown'' error.

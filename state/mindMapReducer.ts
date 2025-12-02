@@ -3,6 +3,7 @@ import type { MindMapData, MindMapNodeData, NodeType, NodePriority, ReviewStatus
 import { NODE_TYPE_PROPS } from '../constants';
 import { findAllDescendantUuids, findAllDescendantUseCaseUuidsAndIds } from '../utils/findAllDescendantIds';
 import { cloneNodeTree } from '../utils/treeUtils';
+import { autoLayout } from '../utils/autoLayout';
 
 export type MindMapAction =
     | { type: 'SET_MIND_MAP'; payload: MindMapData }
@@ -10,7 +11,7 @@ export type MindMapAction =
     | { type: 'UPDATE_NODE_TYPE'; payload: { nodeUuid: string; nodeType: NodeType } }
     | { type: 'UPDATE_NODE_PRIORITY'; payload: { nodeUuid: string; priorityLevel: NodePriority } }
     | { type: 'UPDATE_NODE_POSITION'; payload: { nodeUuid: string; position: { x: number; y: number } } }
-    | { type: 'UPDATE_NODE_SIZE'; payload: { nodeUuid: string, width: number, height: number } }
+    | { type: 'UPDATE_NODE_SIZE'; payload: { nodeUuid: string, width: number, height: number, shouldLayout?: boolean } }
     | { type: 'REPARENT_NODE'; payload: { nodeUuid: string; newParentUuid: string; oldParentUuid: string } }
     | { type: 'REORDER_NODE'; payload: { draggedNodeUuid: string; targetSiblingUuid: string; position: 'before' | 'after' } }
     | { type: 'TOGGLE_NODE_COLLAPSE', payload: { nodeUuid: string } }
@@ -186,12 +187,12 @@ export const mindMapReducer = (state: MindMapData, action: MindMapAction): MindM
         }
 
         case 'UPDATE_NODE_SIZE': {
-            const { nodeUuid, width, height } = action.payload;
+            const { nodeUuid, width, height, shouldLayout } = action.payload;
             const node = state.nodes[nodeUuid];
             if (!node) return state;
             if (node.width === width && node.height === height) return state;
             
-            return {
+            const newState = {
                 ...state,
                 nodes: {
                     ...state.nodes,
@@ -202,6 +203,12 @@ export const mindMapReducer = (state: MindMapData, action: MindMapAction): MindM
                     },
                 },
             };
+
+            if (shouldLayout) {
+                return autoLayout(newState);
+            }
+
+            return newState;
         }
 
         case 'REPARENT_NODE': {

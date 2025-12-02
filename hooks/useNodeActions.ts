@@ -46,8 +46,8 @@ export const useNodeActions = (
                 parentUuid,
                 childNodeList: [],
                 position: { x: 0, y: 0 },
-                height: MIN_NODE_HEIGHT,
-                width: MIN_NODE_WIDTH,
+                height: undefined, // undefined forces re-measurement
+                width: undefined,  // undefined forces re-measurement
                 nodeType: 'GENERAL',
                 priorityLevel: null,
                 isCollapsed: false,
@@ -121,8 +121,8 @@ export const useNodeActions = (
                 parentUuid,
                 childNodeList: [],
                 position: { x: 0, y: 0 },
-                height: MIN_NODE_HEIGHT,
-                width: MIN_NODE_WIDTH,
+                height: undefined, // undefined forces re-measurement
+                width: undefined,  // undefined forces re-measurement
                 nodeType: newNodeType,
                 priorityLevel: null,
                 isCollapsed: false,

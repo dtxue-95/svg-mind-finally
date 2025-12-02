@@ -1,3 +1,4 @@
+
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 import ReactDOM from 'react-dom/client';
 import App, { AppRef, DataChangeInfo, RawNode, OperationType, InteractionMode } from './App';
@@ -5,21 +6,58 @@ import { mockInitialData } from './mockData';
 import { FiMousePointer, FiMove } from 'react-icons/fi';
 import './styles.css'
 
+// 辅助函数：递归丰富数据，模拟后端处理逻辑
+const enrichRawData = (node: RawNode): RawNode => {
+    // 1. 如果节点没有 ID (说明是前端新加的或复制粘贴的)，模拟生成 ID
+    if (!node.id) {
+        node.id = Math.floor(Math.random() * 100000000);
+        
+        // 2. 模拟后端为特定类型的节点添加默认业务属性 (评审、备注、评分)
+        // 这些属性会导致前端渲染图标，从而测试布局是否会自动适应
+        if (['moduleNode', 'testPointNode', 'caseNode'].includes(node.nodeType || '')) {
+             node.reviewStatusCode = 'pending_review'; 
+             node.reviewStatusName = '待评审';
+             // 强制设置为 true 以测试回显时的布局挤压问题
+             node.hasRemark = true;
+             node.hasScore = true;
+             node.scoreInfo = { scoreValue: 5, scoreName: '优秀', scoreCode: 'EXCELLENT' };
+        }
+
+        // 3. 如果是用例节点，模拟添加功能用例 DTO，触发“功能”标签和状态显示
+        if (node.nodeType === 'caseNode') {
+            if (!node.functionTestCaseDTO) {
+                node.functionTestCaseDTO = {
+                    executionStatus: 'not_run', 
+                    finalStatus: 'pending_execution',
+                    testCaseName: node.name
+                };
+            }
+        }
+    }
+
+    // 递归处理子节点
+    if (node.childNodeList) {
+        node.childNodeList = node.childNodeList.map(enrichRawData);
+    }
+    return node;
+};
+
 // 模拟一个后端 API
 const fakeApi = {
   // 接收前端数据，处理后返回更新后的完整数据
   saveData: (data: RawNode): Promise<{ success: boolean, updatedData: RawNode }> => {
     console.log("☁️ [Backend] 正在向服务器后台保存数据...", data);
     
-    // 模拟后端处理：
-    // 1. 给根节点名称加上时间戳表明保存时间
-    // 2. 实际业务中，这里会为新节点生成数据库 ID
     const now = new Date().toLocaleTimeString();
-    const updatedDataFromServer = {
-      ...data,
-      // 仅为了演示：更新根节点名字以显示保存状态
-      name: data.name ? (data.name.split(' (Last Saved:')[0] + ` (Last Saved: ${now})`) : 'Undefined', 
-    };
+    
+    // 深拷贝以避免直接修改输入引用 (虽然在 App 外部是新的引用)
+    let updatedDataFromServer = JSON.parse(JSON.stringify(data));
+
+    // 1. 更新根节点名字以显示保存状态
+    updatedDataFromServer.name = updatedDataFromServer.name ? (updatedDataFromServer.name.split(' (Last Saved:')[0] + ` (Last Saved: ${now})`) : 'Undefined';
+    
+    // 2. 调用辅助函数，模拟后端填充 ID 和业务字段
+    updatedDataFromServer = enrichRawData(updatedDataFromServer);
 
     return new Promise(resolve => {
       setTimeout(() => {

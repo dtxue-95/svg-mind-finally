@@ -253,59 +253,33 @@ foreignObject {
 }
 
 
-/* New AI Ribbon Styles (no pseudo-elements) */
+/* New AI Tag Styles (Floating Badge/Pill) */
 .ai-ribbon-wrapper {
   position: absolute;
-  width: 20px;
-  height: 20px;
-  top: -10px;
-  left: -10px;
+  top: -8px;
+  left: -4px;
   z-index: 2;
-  transform: rotate(-45deg);
+  width: auto;
+  height: auto;
+  transform: none; /* Remove previous rotation */
+  pointer-events: none; /* Let events pass through to node if needed, but text is usually fine */
 }
 
 .ai-ribbon-main {
-    position: absolute;
-    top: 15px;
-    left: -5px;
-    width: 28px;
-    background-color: #a57bece1;
+    position: relative;
+    top: 0;
+    left: 0;
+    width: auto;
+    padding: 2px 8px;
+    border-radius: 12px;
     display: flex;
     justify-content: center;
     align-items: center;
     color: white;
     font-weight: 600;
-    font-size: 8px;
-    box-shadow: 0 2px 3px rgba(0, 0, 0, 0.25);
-    border-top-left-radius: 18px;
-    border-top-right-radius: 18px;
-}
-
-.manual-ribbon-wrapper {
-  position: absolute;
-  width: 20px;
-  height: 20px;
-  top: -10px;
-  left: -10px;
-  z-index: 2;
-  transform: rotate(-45deg);
-}
-
-.manual-ribbon-main {
-    position: absolute;
-    top: 15px;
-    left: -5px;
-    width: 28px;
-    background-color: #44c871ab;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    color: white;
-    font-weight: 600;
-    font-size: 8px;
-    box-shadow: 0 2px 3px rgba(0, 0, 0, 0.25);
-    border-top-left-radius: 18px;
-    border-top-right-radius: 18px;
+    font-size: 10px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    white-space: nowrap;
 }
 
 

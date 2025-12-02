@@ -450,7 +450,7 @@ const MindMapNodeComponent: React.FC<MindMapNodeProps> = ({
                             color: generateModeConfig.textColor 
                         }}
                     >
-                        {node.generateModeName === 'AI生成后修改' ? 'AI改' : node.generateModeName}
+                        {node.generateModeName}
                     </div>
                 </div>
             )}

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef, useLayoutEffect, useCallback } from 'react';
 import type { MindMapNodeData } from '../types';
 import { NODE_TYPE_PROPS, PRIORITY_PROPS, MIN_NODE_HEIGHT, MAX_NODE_WIDTH, MIN_NODE_WIDTH } from '../constants';
@@ -51,6 +52,12 @@ const STATUS_COLOR_PROPS: Record<string, { color: string; backgroundColor: strin
     run_interrupt: { color: '#ff3b30', backgroundColor: '#fff0ef' }, // 执行中断
     run_failed: { color: '#ff3b30', backgroundColor: '#fff0ef' }, // 执行失败
     default: { color: '#8e8e93', backgroundColor: '#f4f4f7' }, // default gray
+};
+
+const GENERATE_MODE_CONFIG: Record<string, { color: string; textColor: string; }> = {
+    'human_generated': { color: '#44c871ab', textColor: 'white' },
+    'ai_generated': { color: '#a57bece1', textColor: 'white' },
+    'modify_after_ai_generation': { color: '#007affab', textColor: 'white' },
 };
 
 const MindMapNodeComponent: React.FC<MindMapNodeProps> = ({
@@ -187,7 +194,9 @@ const MindMapNodeComponent: React.FC<MindMapNodeProps> = ({
         showScoreInfo,
         showAITag,
         showNodeType,
-        showPriority
+        showPriority,
+        node.generateModeCode,
+        node.generateModeName
     ]);
 
 
@@ -420,6 +429,8 @@ const MindMapNodeComponent: React.FC<MindMapNodeProps> = ({
         );
     };
 
+    // --- Dynamic Generation Mode Ribbon ---
+    const generateModeConfig = node.generateModeCode ? GENERATE_MODE_CONFIG[node.generateModeCode] : null;
 
     return (
         <div
@@ -430,16 +441,20 @@ const MindMapNodeComponent: React.FC<MindMapNodeProps> = ({
             onContextMenu={handleContextMenu}
             data-node-uuid={node.uuid}
         >
-            {node.generateModeName === 'AI' && showAITag && (
+            {showAITag && generateModeConfig && (
                 <div className="ai-ribbon-wrapper">
-                    <div className="ai-ribbon-main">AI</div>
+                    <div 
+                        className="ai-ribbon-main" 
+                        style={{ 
+                            backgroundColor: generateModeConfig.color, 
+                            color: generateModeConfig.textColor 
+                        }}
+                    >
+                        {node.generateModeName === 'AI生成后修改' ? 'AI改' : node.generateModeName}
+                    </div>
                 </div>
             )}
-            {node.generateModeName === '人工' && showAITag && (
-                <div className="manual-ribbon-wrapper">
-                    <div className="manual-ribbon-main">人工</div>
-                </div>
-            )}
+            
             <div className="mind-map-node__content" ref={contentRef} style={contentStyle}>
                 {showNodeType && node.nodeType !== 'GENERAL' && node.nodeType !== 'USE_CASE' && (
                     <span 

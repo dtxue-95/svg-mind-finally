@@ -45,7 +45,8 @@ export interface MindMapNodeData {
   height?: number;
   nodeType?: NodeType;
   priorityLevel?: NodePriority;
-  generateModeName?: 'AI' | '人工';
+  generateModeName?: string; // Changed from literal type to string to support dynamic values
+  generateModeCode?: string; // Added field for dynamic mode identification
   isCollapsed?: boolean;
   caseTags?: ('function' | 'api' | 'ui')[];
   functionTestCaseStatusCode?: string | null;
@@ -86,7 +87,8 @@ export interface RawNode {
     nodeType?: string;
     priorityLevel?: string;
     childNodeList?: RawNode[];
-    generateModeName?: 'AI' | '人工';
+    generateModeName?: string; // Changed to string
+    generateModeCode?: string; // Added field
     parentId?: number | string;
     functionTestCaseDTO?: object;
     apiTestCaseDTO?: object;
@@ -194,7 +196,8 @@ export interface RawCallbackNodeData {
   height?: number;
   nodeType?: string;
   priorityLevel?: string | null;
-  generateModeName?: 'AI' | '人工';
+  generateModeName?: string;
+  generateModeCode?: string; // Added field
   isCollapsed?: boolean;
   sortNumber?: number;
   

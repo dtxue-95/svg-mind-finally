@@ -1,4 +1,5 @@
 
+
 import type { MindMapData, MindMapNodeData, RawNode, ReviewStatusCode } from '../types';
 import { nodeTypeMapping, priorityMapping } from '../types';
 import { MIN_NODE_HEIGHT } from '../constants';
@@ -63,6 +64,7 @@ export const createInitialMindMap = (rawData: RawNode): MindMapData => {
             nodeType: nodeTypeMapping[rawNode.nodeType!] || 'GENERAL',
             priorityLevel: typeof rawNode.priorityLevel !== 'undefined' ? priorityMapping[rawNode.priorityLevel as keyof typeof priorityMapping] : null,
             generateModeName: rawNode.generateModeName,
+            generateModeCode: rawNode.generateModeCode,
             isCollapsed: false,
             // The sortNumber for the current node comes from the `rawNode` argument,
             // which was already processed by its parent in the previous call.

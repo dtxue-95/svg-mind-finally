@@ -1,3 +1,4 @@
+
 import type { RawNode } from './types';
 
 export const mockInitialData: RawNode = {
@@ -15,6 +16,7 @@ export const mockInitialData: RawNode = {
             "uuid":"2ccbc90456741789ee8dae41u5dsa3444",
             "name": "采购项目管理",
             "generateModeName":"人工",
+            "generateModeCode":"human_generated",
             "nodeType": "moduleNode",
             "hasRemark": false,
             "hasScore": false,
@@ -28,6 +30,7 @@ export const mockInitialData: RawNode = {
                     "name": "采购公告",
                     "nodeType": "testPointNode",
                     "generateModeName":"AI",
+                    "generateModeCode":"ai_generated",
                     "reviewStatusCode": "pending_review",
                     "reviewStatusName": "待评审",
                     "childNodeList": [{
@@ -90,7 +93,8 @@ export const mockInitialData: RawNode = {
                     "parentId": 510,
                     "uuid":"2ccbc90456741789ee8dae41u5dsa3448",
                     "name": "项目报名",
-                    "generateModeName":"AI",
+                    "generateModeName":"AI生成后修改",
+                    "generateModeCode":"modify_after_ai_generation",
                     "nodeType": "testPointNode",
                     "reviewStatusCode": "pending_review",
                     "reviewStatusName": "待评审",
@@ -101,6 +105,7 @@ export const mockInitialData: RawNode = {
                         "uuid":"702bc90456741789ee8dae41u5dsa3447",
                         "name": "验证阿里云采购项目报名平台入口的可访问性",
                         "generateModeName":"AI",
+                        "generateModeCode":"ai_generated",
                         "nodeType": "caseNode",
                         "priorityLevel":"2",
                         "hasRemark": false,
@@ -112,8 +117,8 @@ export const mockInitialData: RawNode = {
                           "remark": "步骤清晰",
                           "id": 2
                         },
-                        "reviewStatusCode": "approved",
-                        "reviewStatusName": "通过",
+                        "reviewStatusCode": "pending_review",
+                        "reviewStatusName": "待评审",
                         "functionTestCaseDTO":{
                             "finalStatus": "passed",
                              "executionStatus": "not_run"
@@ -127,6 +132,7 @@ export const mockInitialData: RawNode = {
                     "uuid":"2ccbc90456741789ee8dae41u5dsa3449",
                     "name": "首页布局",
                     "generateModeName":"AI",
+                    "generateModeCode":"ai_generated",
                     "nodeType": "testPointNode",
                     "reviewStatusCode": "pending_review",
                     "reviewStatusName": "待评审",
@@ -139,8 +145,8 @@ export const mockInitialData: RawNode = {
                         "priorityLevel": "3",
                         "hasRemark": true,
                         "hasScore": false,
-                        "reviewStatusCode": "rejected",
-                        "reviewStatusName": "未通过",
+                        "reviewStatusCode": "pending_review",
+                        "reviewStatusName": "待评审",                       
                         "functionTestCaseDTO": {
                             "finalStatus": "blocked"
                         }
@@ -153,6 +159,7 @@ export const mockInitialData: RawNode = {
             "uuid":"2ccbc90456741789ee8dae41u5dsa3445",
             "name": "供应商管理",
             "generateModeName":"AI",
+            "generateModeCode":"ai_generated",
             "nodeType": "moduleNode",
             "hasRemark": false,
             "hasScore": false,
@@ -165,6 +172,7 @@ export const mockInitialData: RawNode = {
                     "uuid":"2ccbc90456741789ee8dae41u5dsa1765",
                     "name": "首页布局1",
                     "generateModeName":"AI",
+                    "generateModeCode":"ai_generated",
                     "nodeType": "testPointNode",
                     "hasRemark": true,
                     "hasScore": false,
@@ -179,6 +187,7 @@ export const mockInitialData: RawNode = {
             "uuid":"2ccbc90456741789ee8dae41u5dsa3446",
             "name": "合同管理",
             "generateModeName":"AI",
+            "generateModeCode":"ai_generated",
             "nodeType": "moduleNode",
             "hasRemark": false,
             "hasScore": false,

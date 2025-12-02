@@ -1,4 +1,5 @@
 
+
 import { MindMapData, MindMapNodeData, RawNode, reverseNodeTypeMapping, reversePriorityMapping } from '../types';
 
 /**
@@ -16,6 +17,7 @@ export const convertSingleMindMapNodeToRawNode = (node?: MindMapNodeData): RawNo
         nodeType: node.nodeType ? reverseNodeTypeMapping[node.nodeType] : undefined,
         priorityLevel: node.priorityLevel ? String(reversePriorityMapping[node.priorityLevel]) : undefined,
         generateModeName: node.generateModeName,
+        generateModeCode: node.generateModeCode,
         id: node.id,
         parentId: node.parentId,
         sortNumber: node.sortNumber,
@@ -40,6 +42,7 @@ export const convertSingleMindMapNodeToRawNode = (node?: MindMapNodeData): RawNo
     if (rawNode.nodeType === undefined) delete rawNode.nodeType;
     if (rawNode.priorityLevel === undefined || rawNode.priorityLevel === null) delete rawNode.priorityLevel;
     if (rawNode.generateModeName === undefined) delete rawNode.generateModeName;
+    if (rawNode.generateModeCode === undefined) delete rawNode.generateModeCode;
     if (rawNode.sortNumber === undefined) delete rawNode.sortNumber;
 
     return rawNode;

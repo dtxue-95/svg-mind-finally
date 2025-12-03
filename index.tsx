@@ -1,9 +1,11 @@
 
+
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 import ReactDOM from 'react-dom/client';
 import App, { AppRef, DataChangeInfo, RawNode, OperationType, InteractionMode } from './App';
 import { mockInitialData } from './mockData';
 import { FiMousePointer, FiMove } from 'react-icons/fi';
+import { RemarkDrawer } from './components/RemarkDrawer';
 import './styles.css'
 
 // 辅助函数：递归丰富数据，模拟后端处理逻辑
@@ -76,10 +78,32 @@ function ComprehensiveExample() {
     const [isAutoSaveEnabled, setIsAutoSaveEnabled] = useState(false); // 默认关闭自动保存
     const [isReadOnly, setIsReadOnly] = useState(true); // 追踪 xmind 的只读状态
     const [interactionMode, setInteractionMode] = useState<InteractionMode>('zoom'); // 交互模式：缩放/滚动
+    
+    // State for Custom Remark Drawer
+    const [remarkDrawerVisible, setRemarkDrawerVisible] = useState(false);
+    const [activeRemarkNode, setActiveRemarkNode] = useState<RawNode | null>(null);
+
+    // 递归查找节点 (用于在点击备注时获取节点信息)
+    const findNodeByUuid = useCallback((node: RawNode, uuid: string): RawNode | null => {
+        if (node.uuid === uuid) return node;
+        if (node.childNodeList) {
+            for (const child of node.childNodeList) {
+                const found = findNodeByUuid(child, uuid);
+                if (found) return found;
+            }
+        }
+        return null;
+    }, []);
+    
+    // 获取当前数据的 ref，以便在 callback 中访问最新状态
+    const currentDataRef = useRef<RawNode>(mockInitialData);
 
     // 统一的保存处理逻辑 (无论是自动保存触发还是手动按钮触发)
     const handleSave = useCallback(async (info: DataChangeInfo) => {
         if (!mindMapRef.current) return;
+        
+        // 更新本地数据 ref
+        currentDataRef.current = info.currentRawData;
         
         const isAutoSave = info.description === 'Auto-save triggered';
         const triggerType = isAutoSave ? '自动' : '手动';
@@ -104,6 +128,9 @@ function ComprehensiveExample() {
                     mindMapRef.current.resetHistory();
                 }
 
+                // 更新本地数据 ref
+                currentDataRef.current = result.updatedData;
+
                 setStatusText('✅ 已保存');
                 setLastSavedTime(new Date().toLocaleTimeString());
             }
@@ -115,6 +142,9 @@ function ComprehensiveExample() {
 
     // 监听数据变化的回调 (仅用于更新 UI 状态)
     const handleDataChange = useCallback((info: DataChangeInfo) => {
+        // 更新本地数据 ref，确保后续点击备注时能查找到最新节点
+        currentDataRef.current = info.currentRawData;
+
         const ignoredOperations = [
             OperationType.SELECT_NODE,
             OperationType.LOAD_DATA,
@@ -138,6 +168,27 @@ function ComprehensiveExample() {
             setStatusText('编辑模式');
         }
     }, []);
+
+    // Handle opening the custom remark drawer
+    const handleRemarkClick = useCallback((nodeUuid: string) => {
+        // Find the full node data from current data source
+        const node = findNodeByUuid(currentDataRef.current, nodeUuid);
+        if (node) {
+            setActiveRemarkNode(node);
+            setRemarkDrawerVisible(true);
+        }
+    }, [findNodeByUuid]);
+
+    // Handle saving the remark from the drawer
+    const handleSaveRemark = useCallback((content: string) => {
+        if (activeRemarkNode && mindMapRef.current) {
+            // Use the imperative API to update the node's remark
+            // This will trigger internal logic to add it to history
+            mindMapRef.current.confirmRemark(activeRemarkNode.uuid!, content);
+            setRemarkDrawerVisible(false);
+            setStatusText('📝 备注已更新');
+        }
+    }, [activeRemarkNode]);
 
     return (
         <div style={{ width: '100%', height: '100vh', display: 'flex', flexDirection: 'column' }}>
@@ -235,11 +286,19 @@ function ComprehensiveExample() {
                     interactionMode={interactionMode}
                     onInteractionModeChange={setInteractionMode}
                     
-                    // 默认开启交互模式切换 (无需传参，默认即为 true)
-                    // enableInteractionModeSwitch={true}
+                    // 传递自定义备注点击回调
+                    onRemarkClick={handleRemarkClick}
 
                     // 当自动保存开启时，可以隐藏保存按钮，或者保留它作为“立即保存”
                     topToolbarCommands={['undo', 'redo', 'separator', 'addSibling', 'addChild', 'delete', 'save', 'closeTop']}
+                 />
+
+                 {/* Custom Remark Drawer rendered at top level */}
+                 <RemarkDrawer 
+                    visible={remarkDrawerVisible}
+                    node={activeRemarkNode}
+                    onClose={() => setRemarkDrawerVisible(false)}
+                    onSave={handleSaveRemark}
                  />
             </div>
         </div>

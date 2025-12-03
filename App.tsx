@@ -94,6 +94,7 @@ interface AppProps {
     enableInteractionModeSwitch?: boolean;
     interactionMode?: InteractionMode;
     onInteractionModeChange?: (mode: InteractionMode) => void;
+    onRemarkClick?: (nodeUuid: string) => void; // New prop
     children?: React.ReactNode;
 }
 
@@ -150,6 +151,7 @@ const App = forwardRef<AppRef, AppProps>(({
     enableInteractionModeSwitch = true,
     interactionMode: interactionModeProp,
     onInteractionModeChange,
+    onRemarkClick,
     children,
 }, ref) => {
     // State to hold the data for the mind map. Initialized from props.
@@ -556,6 +558,7 @@ const App = forwardRef<AppRef, AppProps>(({
                 interactionMode={interactionMode}
                 onSetInteractionMode={handleSetInteractionMode}
                 enableInteractionModeSwitch={enableInteractionModeSwitch}
+                onRemarkClick={onRemarkClick}
             >
                 {children}
             </MindMapCanvas>

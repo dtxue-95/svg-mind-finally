@@ -1,3 +1,4 @@
+
 import React, { useCallback, useRef, useEffect, useReducer, useMemo, useState } from 'react';
 import type { MindMapData, CommandId, MindMapNodeData, NodeType, NodePriority, DataChangeCallback, CanvasTransform, ReviewStatusCode, ScoreInfo, ConnectorStyle, InteractionMode } from '../types';
 import { MindMapNode } from './MindMapNode';
@@ -10,7 +11,6 @@ import { CanvasContextMenu } from './CanvasContextMenu';
 import { Minimap } from './Minimap';
 import { ShortcutsModal as ShortcutsPanel } from './ShortcutsModal';
 import { ReviewMenu } from './ReviewStatusModal';
-import { RemarkModal } from './RemarkModal';
 import { ScoreModal } from './ScoreModal';
 import { generateElbowPath } from '../utils/generateElbowPath';
 import { generateCurvePath } from '../utils/generateCurvePath';
@@ -160,6 +160,7 @@ interface MindMapCanvasProps {
     interactionMode: InteractionMode;
     onSetInteractionMode: (mode: InteractionMode) => void;
     enableInteractionModeSwitch: boolean;
+    onRemarkClick?: (nodeUuid: string) => void; // New prop for external remark handling
 }
 
 const SvgPath = React.memo(({ d, className }: { d: string, className: string }) => {
@@ -177,7 +178,7 @@ const AUTO_PAN_SPEED = 10;
 
 export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
     mindMapData, onAddChildNode, onAddSiblingNode, onDeleteNode, onFinishEditing, onUpdateNodePosition, onReparentNode, onReorderNode, onLayout, onUpdateNodeSize, onSave, showAITag, isDraggable = false, enableStrictDrag = false, enableNodeReorder = true, reorderableNodeTypes, showNodeType, showPriority, onToggleCollapse, onExpandNodes, onExpandAllNodes, onCollapseAllNodes, onExpandToLevel, onCollapseToLevel, onUpdateNodeType, onUpdateNodePriority, onConfirmReviewStatus, onConfirmRemark, onConfirmScore, onSubmitDefect,
-    onUndo, onRedo, canUndo, canRedo, showTopToolbar, showBottomToolbar, topToolbarCommands, bottomToolbarCommands, strictMode = false, showContextMenu = true, showCanvasContextMenu = true, priorityEditableNodeTypes, onDataChange, onExecuteUseCase, enableUseCaseExecution, enableDefectSubmission, canvasBackgroundColor, showBackgroundDots, showMinimap, getNodeBackgroundColor, enableReadOnlyUseCaseExecution, enableExpandCollapseByLevel, isReadOnly, onToggleReadOnly, onSetReadOnly, isDirty, children, newlyAddedNodeUuid, onNodeFocused, showReadOnlyToggleButtons, showShortcutsButton, enableReviewStatus, enableNodeRemarks, enableNodeScoring, reviewStatusNodeTypes, nodeRemarksNodeTypes, nodeScoringNodeTypes, enableBulkReviewContextMenu, enableSingleReviewContextMenu, connectorStyle, toast, onCloseToast, enableRangeSelection, onPasteNodes, enableNodeCopy = true, interactionMode, onSetInteractionMode, enableInteractionModeSwitch
+    onUndo, onRedo, canUndo, canRedo, showTopToolbar, showBottomToolbar, topToolbarCommands, bottomToolbarCommands, strictMode = false, showContextMenu = true, showCanvasContextMenu = true, priorityEditableNodeTypes, onDataChange, onExecuteUseCase, enableUseCaseExecution, enableDefectSubmission, canvasBackgroundColor, showBackgroundDots, showMinimap, getNodeBackgroundColor, enableReadOnlyUseCaseExecution, enableExpandCollapseByLevel, isReadOnly, onToggleReadOnly, onSetReadOnly, isDirty, children, newlyAddedNodeUuid, onNodeFocused, showReadOnlyToggleButtons, showShortcutsButton, enableReviewStatus, enableNodeRemarks, enableNodeScoring, reviewStatusNodeTypes, nodeRemarksNodeTypes, nodeScoringNodeTypes, enableBulkReviewContextMenu, enableSingleReviewContextMenu, connectorStyle, toast, onCloseToast, enableRangeSelection, onPasteNodes, enableNodeCopy = true, interactionMode, onSetInteractionMode, enableInteractionModeSwitch, onRemarkClick
 }) => {
     const [canvasState, dispatch] = useReducer(canvasReducer, {
         rootUuid: mindMapData.rootUuid,
@@ -805,13 +806,19 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
     }, [mindMapData]);
 
     const handleOpenRemarkModal = useCallback((nodeUuid: string, event: React.MouseEvent) => {
-        setActivePopup({
-            type: 'remark',
-            nodeUuid,
-            x: event.clientX,
-            y: event.clientY,
-        });
-    }, []);
+        // Delegate to parent if handler exists, otherwise fallback (or do nothing as we are replacing it)
+        if (onRemarkClick) {
+            onRemarkClick(nodeUuid);
+        } else {
+            // Fallback to internal behavior if no prop is provided (legacy support)
+            setActivePopup({
+                type: 'remark',
+                nodeUuid,
+                x: event.clientX,
+                y: event.clientY,
+            });
+        }
+    }, [onRemarkClick]);
 
     const handleOpenScoreModal = useCallback((nodeUuid: string, event: React.MouseEvent) => {
         setActivePopup({
@@ -829,6 +836,7 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
         handleClosePopup();
     }, [activePopup.nodeUuid, onConfirmReviewStatus, handleClosePopup]);
 
+    // This internal handler is only used if the internal RemarkModal is active
     const handleConfirmRemark = useCallback((content: string) => {
         if (activePopup.nodeUuid) {
             onConfirmRemark(activePopup.nodeUuid, content);
@@ -858,11 +866,14 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
             if (activePopup.type) {
                 const popupClasses: Record<string, string> = {
                     review: '.bulk-review-menu',
-                    remark: '.remark-modal',
+                    // remark: '.remark-modal', // Remark modal replaced by drawer, popup logic not needed for it if external
                     score: '.score-modal'
                 };
-                if (!target.closest(popupClasses[activePopup.type])) {
-                    handleClosePopup();
+                // Only check for active popup type if it exists in the map
+                if (activePopup.type in popupClasses) {
+                    if (!target.closest(popupClasses[activePopup.type])) {
+                        handleClosePopup();
+                    }
                 }
             }
         };
@@ -1579,16 +1590,6 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
                     onConfirm={handleConfirmReviewStatus}
                     hasUseCases={activePopup.context?.hasUseCases ?? false}
                     nodeType={activePopup.context?.nodeType ?? null}
-                />
-            )}
-
-            {activePopup.type === 'remark' && activePopupNode && (
-                <RemarkModal
-                    x={activePopup.x}
-                    y={activePopup.y}
-                    node={activePopupNode}
-                    onClose={handleClosePopup}
-                    onConfirm={handleConfirmRemark}
                 />
             )}
 

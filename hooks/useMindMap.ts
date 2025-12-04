@@ -10,6 +10,7 @@ import { OperationType } from '../types';
 import { getNodeChainByUuid } from '../utils/dataChangeUtils';
 import { convertDataChangeInfo } from '../utils/callbackDataConverter';
 import { hasUseCaseDescendant, findAllDescendantUuids, findAllDescendantUseCaseUuidsAndIds } from '../utils/findAllDescendantIds';
+import { updateChildSortNumbers } from '../utils/treeUtils';
 
 const historicMindMapReducer = createHistoryReducer(mindMapReducer, {
     ignoreActions: [
@@ -482,13 +483,9 @@ export const useMindMap = (
 
         if (parentUuid) {
             const parentNode = nextState.nodes[parentUuid];
-            const updatedNodes = { ...nextState.nodes };
-            if (parentNode?.childNodeList) {
-                parentNode.childNodeList.forEach((childUuid, index) => {
-                    if (updatedNodes[childUuid]) {
-                        updatedNodes[childUuid] = { ...updatedNodes[childUuid], sortNumber: index + 1 };
-                    }
-                });
+            if (parentNode) {
+                // Use helper to recalculate sort numbers correctly
+                const updatedNodes = updateChildSortNumbers(parentNode, nextState.nodes);
                 stateWithSortedChildren = { ...nextState, nodes: updatedNodes };
             }
         }

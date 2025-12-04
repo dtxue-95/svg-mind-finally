@@ -8,6 +8,7 @@ import type { MindMapAction } from '../state/mindMapReducer';
 import { mindMapReducer } from '../state/mindMapReducer';
 import { OperationType } from '../types';
 import { convertDataChangeInfo } from '../utils/callbackDataConverter';
+import { updateChildSortNumbers } from '../utils/treeUtils';
 
 type DispatchFunction = Dispatch<MindMapAction | { type: 'UNDO' } | { type: 'REDO' }>;
 type PerformLayoutFunction = (map: MindMapData) => MindMapData;
@@ -54,7 +55,7 @@ export const useNodeActions = (
             };
             
             const newChildren = [...(parentNode.childNodeList ?? []), newUuid];
-            const newNodes = {
+            const nodesWithNewChild = {
                 ...mindMap.nodes,
                 [newUuid]: newNode,
                 [parentUuid]: {
@@ -62,12 +63,14 @@ export const useNodeActions = (
                     childNodeList: newChildren,
                 },
             };
-            newChildren.forEach((childUuid, index) => {
-                if (newNodes[childUuid]) {
-                    newNodes[childUuid].sortNumber = index + 1;
-                }
-            });
-            newMindMap = { ...mindMap, nodes: newNodes };
+            
+            // Calculate sort numbers
+            const finalNodes = updateChildSortNumbers(
+                { ...parentNode, childNodeList: newChildren }, 
+                nodesWithNewChild
+            );
+
+            newMindMap = { ...mindMap, nodes: finalNodes };
 
         } else {
             let newNodeType: NodeType | null = null;
@@ -133,7 +136,7 @@ export const useNodeActions = (
                 ? [newUuid, ...parentChildren]
                 : [...parentChildren, newUuid];
             
-            const newNodes = {
+            const nodesWithNewChild = {
                 ...mindMap.nodes,
                 [newUuid]: newNode,
                 [parentUuid]: {
@@ -142,13 +145,13 @@ export const useNodeActions = (
                 },
             };
 
-            newChildren.forEach((childUuid, index) => {
-                if (newNodes[childUuid]) {
-                    newNodes[childUuid].sortNumber = index + 1;
-                }
-            });
+            // Calculate sort numbers
+            const finalNodes = updateChildSortNumbers(
+                { ...parentNode, childNodeList: newChildren }, 
+                nodesWithNewChild
+            );
             
-            newMindMap = { ...mindMap, nodes: newNodes };
+            newMindMap = { ...mindMap, nodes: finalNodes };
         }
 
         const laidOutMap = performLayout(newMindMap);
@@ -216,7 +219,7 @@ export const useNodeActions = (
             .filter((n): n is MindMapNodeData => !!n);
 
         // Create a new nodes object without the deleted nodes
-        const remainingNodes: Record<string, MindMapNodeData> = { ...mindMap.nodes };
+        let remainingNodes: Record<string, MindMapNodeData> = { ...mindMap.nodes };
         nodesToDeleteUuids.forEach(uuid => {
             delete remainingNodes[uuid];
         });
@@ -228,15 +231,12 @@ export const useNodeActions = (
                 ...parentNode,
                 childNodeList: newChildList,
             };
-            // Update sort numbers for remaining children
-            newChildList.forEach((childUuid, index) => {
-                if (remainingNodes[childUuid]) {
-                    remainingNodes[childUuid] = {
-                        ...remainingNodes[childUuid],
-                        sortNumber: index + 1,
-                    };
-                }
-            });
+            
+            // Recalculate sort numbers using the shared utility
+            remainingNodes = updateChildSortNumbers(
+                { ...parentNode, childNodeList: newChildList }, 
+                remainingNodes
+            );
         }
         
         const newMindMap = {
@@ -310,26 +310,10 @@ export const useNodeActions = (
 
         const stateWithReparent = mindMapReducer(mindMap, action);
         
-        const oldParent = stateWithReparent.nodes[originalNode.parentUuid];
-        const newParent = stateWithReparent.nodes[newParentUuid];
-        const updatedNodes = { ...stateWithReparent.nodes };
-
-        // Update sort numbers for old parent's remaining children
-        if (oldParent?.childNodeList) {
-            oldParent.childNodeList.forEach((uuid, index) => {
-                updatedNodes[uuid] = { ...updatedNodes[uuid], sortNumber: index + 1 };
-            });
-        }
-
-        // Update sort numbers for new parent's children
-        if (newParent?.childNodeList) {
-            newParent.childNodeList.forEach((uuid, index) => {
-                updatedNodes[uuid] = { ...updatedNodes[uuid], sortNumber: index + 1 };
-            });
-        }
+        // mindMapReducer now handles updateChildSortNumbers internally for REPARENT_NODE, 
+        // so stateWithReparent already has correct sort numbers.
         
-        const stateWithSortedChildren = { ...stateWithReparent, nodes: updatedNodes };
-        const laidOutMap = performLayout(stateWithSortedChildren);
+        const laidOutMap = performLayout(stateWithReparent);
 
         if (onDataChange) {
             const nodeAfter = laidOutMap.nodes[nodeUuid];

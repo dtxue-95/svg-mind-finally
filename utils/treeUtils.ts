@@ -77,7 +77,7 @@ export const cloneNodeTree = (
         if (originalNode.childNodeList) {
             originalNode.childNodeList.forEach((childUuid, index) => {
                 const childNode = cloneRecursive(childUuid, newUuid);
-                // Ensure sort number is correct within the new tree
+                // Ensure sort number is correct within the new tree (defaulting to index + 1 here, but will be fixed by caller)
                 childNode.sortNumber = index + 1;
                 newNodesMap[childNode.uuid!] = childNode;
                 newChildUuids.push(childNode.uuid!);
@@ -123,4 +123,49 @@ export const filterSelectedNodesForCopy = (selectedUuids: Set<string>, mindMap: 
     });
     
     return filtered;
+};
+
+/**
+ * Updates the sortNumber for all children of a specific parent node.
+ * - If parent is USE_CASE: Steps are numbered from 0, skipping Preconditions.
+ * - Otherwise: All children are numbered from 1.
+ * 
+ * @param parentNode The parent node data
+ * @param allNodes The map of all nodes (will be modified in shallow copy and returned)
+ * @returns A NEW object reference for the nodes map with updated sort numbers
+ */
+export const updateChildSortNumbers = (
+    parentNode: MindMapNodeData,
+    allNodes: Record<string, MindMapNodeData>
+): Record<string, MindMapNodeData> => {
+    const updatedNodes = { ...allNodes };
+    const childrenUuids = parentNode.childNodeList || [];
+
+    if (parentNode.nodeType === 'USE_CASE') {
+        let stepIndex = 0;
+        childrenUuids.forEach(uuid => {
+            const child = updatedNodes[uuid];
+            if (child) {
+                if (child.nodeType === 'STEP') {
+                    updatedNodes[uuid] = { ...child, sortNumber: stepIndex++ };
+                } else {
+                    // Ensure non-steps (like preconditions) don't have misleading sort numbers from previous states
+                    // or keep them if they are useful for other logic. 
+                    // For now, we leave them or reset them if needed.
+                    // If we strictly follow "Precondition does not participate", we might want to clear it?
+                    // But keeping index+1 or original might be safer for React keys/consistency.
+                    // Let's NOT clear it to avoid regressions, just ensure STEPs are correct.
+                }
+            }
+        });
+    } else {
+        childrenUuids.forEach((uuid, index) => {
+            const child = updatedNodes[uuid];
+            if (child) {
+                updatedNodes[uuid] = { ...child, sortNumber: index + 1 };
+            }
+        });
+    }
+
+    return updatedNodes;
 };

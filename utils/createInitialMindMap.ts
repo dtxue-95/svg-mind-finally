@@ -1,5 +1,4 @@
 
-
 import type { MindMapData, MindMapNodeData, RawNode, ReviewStatusCode } from '../types';
 import { nodeTypeMapping, priorityMapping } from '../types';
 import { MIN_NODE_HEIGHT } from '../constants';
@@ -41,13 +40,28 @@ export const createInitialMindMap = (rawData: RawNode): MindMapData => {
      * @param parentUuid The UUID of the parent node, or null for the root.
      */
     const traverse = (rawNode: RawNode, parentUuid: string | null) => {
+        
+        let stepCount = 0;
+
         // Process children to enforce sortNumber before recursion
         const childNodeListWithCorrectSort = (rawNode.childNodeList ?? []).map((child, index) => {
             const updatableNodeTypes = ['moduleNode', 'testPointNode', 'caseNode', 'stepNode'];
+            
+            // Special logic for steps within a use case
+            if (rawNode.nodeType === 'caseNode') {
+                if (child.nodeType === 'stepNode') {
+                    return { ...child, sortNumber: stepCount++ };
+                }
+                // Preconditions or other types inside a caseNode (if any) don't get a sortNumber or keep existing
+                return child;
+            }
+
+            // General logic for other parent types
             if (child.nodeType && updatableNodeTypes.includes(child.nodeType)) {
                 // Overwrite or add sortNumber to be index + 1
                 return { ...child, sortNumber: index + 1 };
             }
+            
             return child;
         });
 

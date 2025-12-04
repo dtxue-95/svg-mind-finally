@@ -2,7 +2,7 @@
 import type { MindMapData, MindMapNodeData, NodeType, NodePriority, ReviewStatusCode, Remark, ScoreInfo } from '../types';
 import { NODE_TYPE_PROPS } from '../constants';
 import { findAllDescendantUuids, findAllDescendantUseCaseUuidsAndIds } from '../utils/findAllDescendantIds';
-import { cloneNodeTree } from '../utils/treeUtils';
+import { cloneNodeTree, updateChildSortNumbers } from '../utils/treeUtils';
 import { autoLayout } from '../utils/autoLayout';
 
 export type MindMapAction =
@@ -219,23 +219,31 @@ export const mindMapReducer = (state: MindMapData, action: MindMapAction): MindM
 
             if (!node || !oldParent || !newParent) return state;
 
+            let updatedNodes = {
+                ...state.nodes,
+                [nodeUuid]: {
+                    ...node,
+                    parentUuid: newParentUuid,
+                },
+                [oldParentUuid]: {
+                    ...oldParent,
+                    childNodeList: (oldParent.childNodeList ?? []).filter(uuid => uuid !== nodeUuid),
+                },
+                [newParentUuid]: {
+                    ...newParent,
+                    childNodeList: [...(newParent.childNodeList ?? []), nodeUuid],
+                },
+            };
+
+            // Update sort numbers for old parent's children
+            updatedNodes = updateChildSortNumbers(updatedNodes[oldParentUuid], updatedNodes);
+            
+            // Update sort numbers for new parent's children
+            updatedNodes = updateChildSortNumbers(updatedNodes[newParentUuid], updatedNodes);
+
             return {
                 ...state,
-                nodes: {
-                    ...state.nodes,
-                    [nodeUuid]: {
-                        ...node,
-                        parentUuid: newParentUuid,
-                    },
-                    [oldParentUuid]: {
-                        ...oldParent,
-                        childNodeList: (oldParent.childNodeList ?? []).filter(uuid => uuid !== nodeUuid),
-                    },
-                    [newParentUuid]: {
-                        ...newParent,
-                        childNodeList: [...(newParent.childNodeList ?? []), nodeUuid],
-                    },
-                },
+                nodes: updatedNodes,
             };
         }
         
@@ -597,17 +605,13 @@ export const mindMapReducer = (state: MindMapData, action: MindMapAction): MindM
                 }
             });
 
-            // Update parent with new children list and update sortNumbers
-            updatedChildList.forEach((childUuid, index) => {
-                if (newNodes[childUuid]) {
-                    newNodes[childUuid] = { ...newNodes[childUuid], sortNumber: index + 1 };
-                }
-            });
-
             newNodes[targetParentUuid] = {
                 ...targetParent,
                 childNodeList: updatedChildList
             };
+
+            // Recalculate sort numbers for the parent's children
+            newNodes = updateChildSortNumbers(newNodes[targetParentUuid], newNodes);
 
             return {
                 ...state,

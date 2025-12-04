@@ -1,4 +1,6 @@
 
+
+
 import React, { useCallback, useRef, useEffect, useReducer, useMemo, useState } from 'react';
 import type { MindMapData, CommandId, MindMapNodeData, NodeType, NodePriority, DataChangeCallback, CanvasTransform, ReviewStatusCode, ScoreInfo, ConnectorStyle, InteractionMode } from '../types';
 import { MindMapNode } from './MindMapNode';
@@ -216,6 +218,9 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
     // Refs for edge auto-panning
     const autoPanRequestRef = useRef<number | null>(null);
     const autoPanDirectionRef = useRef({ x: 0, y: 0 });
+
+    const interactionModeRef = useRef(interactionMode);
+    interactionModeRef.current = interactionMode;
 
     const visibleNodeUuids = useMemo(() => {
         const visible = new Set<string>();
@@ -885,62 +890,73 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
     }, [contextMenu.isVisible, canvasContextMenu.isVisible, activePopup.type, handleCloseContextMenu, handleCloseCanvasContextMenu, handleClosePopup]);
 
 
-    const handleWheel = (e: React.WheelEvent) => {
-        e.preventDefault();
-        handleCloseContextMenu();
-        handleCloseCanvasContextMenu();
-        if (!canvasRef.current) return;
+    // -------------------------------------------------------------------------
+    // Refactored Wheel Handling:
+    // We attach a native event listener with { passive: false } to properly 
+    // prevent default browser gestures (like trackpad swipe back/forward).
+    // -------------------------------------------------------------------------
+    useEffect(() => {
+        const canvas = canvasRef.current;
+        if (!canvas) return;
 
-        if (interactionMode === 'scroll') {
-            // Scroll Mode: Wheel moves the canvas (Pan)
-            // Use negative delta to create natural scrolling direction (scroll down -> move view down -> content moves up)
-            // Or standard paper-drag direction. 
-            // Standard scroll: Wheel Down (positive deltaY) moves viewport down.
-            // If viewport moves down, canvas contents (transform Y) move up (negative).
-            // So dy should be -deltaY.
-            const panDx = -e.deltaX;
-            const panDy = -e.deltaY;
+        const onWheel = (e: WheelEvent) => {
+            // CRITICAL: Prevent browser navigation (swipe back/forward) and native scrolling
+            e.preventDefault();
 
-            if (dragState) {
-                // If dragging a node, update the drag start pos reference so the node stays under cursor visually
-                dragStartPosRef.current.x += panDx;
-                dragStartPosRef.current.y += panDy;
-            }
+            handleCloseContextMenu();
+            handleCloseCanvasContextMenu();
 
-            dispatch({ type: 'PAN', payload: { dx: panDx, dy: panDy }});
-            
-            if (dragState) {
-                 // Immediate update for drag visual
-                 updateDrag();
-            }
+            // Access latest state via ref to avoid stale closures without re-binding listener
+            const { dragState, transform } = canvasStateRef.current;
+            const currentInteractionMode = interactionModeRef.current;
 
-        } else {
-            // Zoom Mode (Default): Wheel zooms
-            if (dragState) {
-                // Allow panning while dragging even in zoom mode if needed, 
-                // but usually wheel zooms. 
-                // To keep consistent with existing behavior, dragging + wheel = pan logic from before?
-                // The previous code had `if (dragState) { ... PAN ... } else { ... ZOOM ... }`.
-                // We preserve that priority: if dragging, wheel always pans to help move nodes offscreen.
+            if (currentInteractionMode === 'scroll') {
+                // Scroll Mode: Wheel moves the canvas (Pan)
                 const panDx = -e.deltaX;
                 const panDy = -e.deltaY;
 
-                dragStartPosRef.current.x += panDx;
-                dragStartPosRef.current.y += panDy;
+                if (dragState) {
+                    dragStartPosRef.current.x += panDx;
+                    dragStartPosRef.current.y += panDy;
+                }
 
                 dispatch({ type: 'PAN', payload: { dx: panDx, dy: panDy }});
+                
+                if (dragState) {
+                     updateDrag();
+                }
+
             } else {
-                const sensitivity = 0.0025;
-                const scaleAmount = Math.pow(2, -e.deltaY * sensitivity);
+                // Zoom Mode (Default): Wheel zooms
+                if (dragState) {
+                    // Priority: if dragging, wheel always pans to help move nodes offscreen.
+                    const panDx = -e.deltaX;
+                    const panDy = -e.deltaY;
 
-                const rect = canvasRef.current.getBoundingClientRect();
-                const mouseX = e.clientX - rect.left;
-                const mouseY = e.clientY - rect.top;
+                    dragStartPosRef.current.x += panDx;
+                    dragStartPosRef.current.y += panDy;
 
-                dispatch({ type: 'ZOOM', payload: { scaleAmount, centerX: mouseX, centerY: mouseY } });
+                    dispatch({ type: 'PAN', payload: { dx: panDx, dy: panDy }});
+                } else {
+                    const sensitivity = 0.0025;
+                    const scaleAmount = Math.pow(2, -e.deltaY * sensitivity);
+
+                    const rect = canvas.getBoundingClientRect();
+                    const mouseX = e.clientX - rect.left;
+                    const mouseY = e.clientY - rect.top;
+
+                    dispatch({ type: 'ZOOM', payload: { scaleAmount, centerX: mouseX, centerY: mouseY } });
+                }
             }
-        }
-    };
+        };
+
+        // Add listener with passive: false to allow preventDefault()
+        canvas.addEventListener('wheel', onWheel, { passive: false });
+
+        return () => {
+            canvas.removeEventListener('wheel', onWheel);
+        };
+    }, [dispatch, updateDrag, handleCloseContextMenu, handleCloseCanvasContextMenu]); 
 
     const startPanning = useCallback((e: React.MouseEvent) => {
         document.body.classList.add('canvas-interaction-no-select');
@@ -1269,7 +1285,7 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
         <div 
             className={`mind-map-canvas ${showBackgroundDots ? 'mind-map-canvas--with-dots' : ''}`}
             ref={canvasRef}
-            onWheel={handleWheel}
+            // onWheel handler removed here, replaced by useEffect above
             onMouseDown={handleCanvasMouseDown}
             onContextMenu={handleCanvasContextMenu}
             style={{ 

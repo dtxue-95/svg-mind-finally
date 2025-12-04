@@ -47,6 +47,11 @@ body, html {
   cursor: grab;
   overflow: hidden;
   user-select: none; /* Prevent text selection on canvas drag */
+  
+  /* Prevent browser back/forward navigation gestures */
+  overscroll-behavior: none;
+  /* Prevent default touch actions like pinch-zoom handled by browser */
+  touch-action: none;
 }
 
 .mind-map-canvas--with-dots {

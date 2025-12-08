@@ -2,7 +2,7 @@
 
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 import ReactDOM from 'react-dom/client';
-import App, { AppRef, DataChangeInfo, RawNode, OperationType, InteractionMode } from './App';
+import App, { AppRef, DataChangeInfo, RawNode, OperationType, InteractionMode, Remark } from './App';
 import { mockInitialData } from './mockData';
 import { FiMousePointer, FiMove } from 'react-icons/fi';
 import { RemarkDrawer } from './components/RemarkDrawer';
@@ -68,6 +68,17 @@ const fakeApi = {
       }, 600); // 模拟 0.6秒 网络延迟
     });
   },
+  
+  saveRemark: (remark: Remark): Promise<{ success: boolean, id: number }> => {
+      console.log("☁️ [Backend] 正在保存备注...", remark);
+      return new Promise(resolve => {
+          setTimeout(() => {
+              const newId = Math.floor(Math.random() * 10000);
+              console.log(`✅ [Backend] 备注保存成功！ID: ${newId}`);
+              resolve({ success: true, id: newId });
+          }, 500);
+      });
+  }
 };
 
 
@@ -83,18 +94,6 @@ function ComprehensiveExample() {
     const [remarkDrawerVisible, setRemarkDrawerVisible] = useState(false);
     const [activeRemarkNode, setActiveRemarkNode] = useState<RawNode | null>(null);
 
-    // 递归查找节点 (用于在点击备注时获取节点信息)
-    const findNodeByUuid = useCallback((node: RawNode, uuid: string): RawNode | null => {
-        if (node.uuid === uuid) return node;
-        if (node.childNodeList) {
-            for (const child of node.childNodeList) {
-                const found = findNodeByUuid(child, uuid);
-                if (found) return found;
-            }
-        }
-        return null;
-    }, []);
-    
     // 获取当前数据的 ref，以便在 callback 中访问最新状态
     const currentDataRef = useRef<RawNode>(mockInitialData);
 
@@ -170,23 +169,57 @@ function ComprehensiveExample() {
     }, []);
 
     // Handle opening the custom remark drawer
-    const handleRemarkClick = useCallback((nodeUuid: string) => {
-        // Find the full node data from current data source
-        const node = findNodeByUuid(currentDataRef.current, nodeUuid);
+    // Optimization: Directly receive the node data without traversing
+    const handleRemarkClick = useCallback((node: RawNode) => {
         if (node) {
             setActiveRemarkNode(node);
             setRemarkDrawerVisible(true);
         }
-    }, [findNodeByUuid]);
+    }, []);
 
     // Handle saving the remark from the drawer
-    const handleSaveRemark = useCallback((content: string) => {
+    const handleSaveRemark = useCallback(async (content: string) => {
         if (activeRemarkNode && mindMapRef.current) {
-            // Use the imperative API to update the node's remark
-            // This will trigger internal logic to add it to history
-            mindMapRef.current.confirmRemark(activeRemarkNode.uuid!, content);
+            const nodeUuid = activeRemarkNode.uuid!;
+            
+            // 1. Optimistic Update: Add remark immediately to the UI (gets a temp ID)
+            // confirmRemark now returns the created remark object
+            const tempRemark = mindMapRef.current.confirmRemark(nodeUuid, content);
+            
             setRemarkDrawerVisible(false);
-            setStatusText('📝 备注已更新');
+            setStatusText('⏳ 正在保存备注...');
+
+            if (tempRemark) {
+                try {
+                    // 2. Call Backend API
+                    const result = await fakeApi.saveRemark(tempRemark);
+                    
+                    if (result.success) {
+                        const realId = result.id;
+                        
+                        // 3. Get the latest node data to access the current list
+                        // Using getNode allows us to avoid traversing the whole tree
+                        const currentNode = mindMapRef.current.getNode(nodeUuid);
+                        
+                        if (currentNode && currentNode.RemarkHistory) {
+                            // 4. Swap the temp ID with the real ID in the list
+                            const updatedHistory = currentNode.RemarkHistory.map(r => 
+                                r.id === tempRemark.id ? { ...r, id: realId } : r
+                            );
+                            
+                            // 5. Update the node data silently (no history, no full redraw)
+                            mindMapRef.current.partialUpdateNodeData(nodeUuid, {
+                                RemarkHistory: updatedHistory
+                            });
+                            
+                            setStatusText('✅ 备注已同步');
+                        }
+                    }
+                } catch (e) {
+                    console.error("Remark save failed", e);
+                    setStatusText('❌ 备注保存失败');
+                }
+            }
         }
     }, [activeRemarkNode]);
 
@@ -286,7 +319,7 @@ function ComprehensiveExample() {
                     interactionMode={interactionMode}
                     onInteractionModeChange={setInteractionMode}
                     
-                    // 传递自定义备注点击回调
+                    // 传递自定义备注点击回调 (Optimized to receive Node directly)
                     onRemarkClick={handleRemarkClick}
 
                     // 当自动保存开启时，可以隐藏保存按钮，或者保留它作为“立即保存”

@@ -395,7 +395,8 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
             
             if (allNodesExist) {
                 // 1. Multi-select all pasted nodes
-                dispatch({ type: 'SET_MULTI_SELECTION', payload: { nodeUuids: new Set(pastedNodeUuids) } });
+                // Fix: Explicitly cast pastedNodeUuids to string[] to avoid Set<unknown> inference
+                dispatch({ type: 'SET_MULTI_SELECTION', payload: { nodeUuids: new Set(pastedNodeUuids as string[]) } });
                 // Optionally set the first one as the primary selection
                 dispatch({ type: 'SELECT_NODE', payload: { nodeUuid: pastedNodeUuids[0] } });
 
@@ -811,7 +812,7 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
     }, [mindMapData]);
 
     const handleOpenRemarkModal = useCallback((nodeUuid: string, event: React.MouseEvent) => {
-        // Delegate to parent if handler exists, otherwise fallback (or do nothing as we are replacing it)
+        // Delegate to parent if handler exists, passing the nodeUuid which the App wrapper will convert
         if (onRemarkClick) {
             onRemarkClick(nodeUuid);
         } else {
@@ -1024,7 +1025,7 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
                 const worldRight = (boxRight - translateX) / scale;
                 const worldBottom = (boxBottom - translateY) / scale;
 
-                Object.values(mindMapData.nodes).forEach(node => {
+                Object.values(mindMapData.nodes).forEach((node: MindMapNodeData) => {
                     if (!node.position || !node.width || !node.height) return;
                     
                     const nodeLeft = node.position.x;

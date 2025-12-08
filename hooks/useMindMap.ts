@@ -651,7 +651,7 @@ export const useMindMap = (
         return convertDataChangeInfo(fullInfo);
     }, [_prepareReviewStatusUpdate]);
 
-    const confirmRemark = useCallback((nodeUuid: string, content: string) => {
+    const confirmRemark = useCallback((nodeUuid: string, content: string): Remark | undefined => {
         const currentMindMap = mindMapRef.current;
         const node = currentMindMap.nodes[nodeUuid];
         if (!node) return;
@@ -691,6 +691,7 @@ export const useMindMap = (
         }
 
         dispatch(action);
+        return newRemark;
     }, [dispatch]);
 
     const confirmScore = useCallback((nodeUuid: string, scoreInfo: ScoreInfo) => {

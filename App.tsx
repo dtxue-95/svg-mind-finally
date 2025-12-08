@@ -3,17 +3,18 @@
 import React, { useImperativeHandle, forwardRef, useCallback, useState, useEffect, useMemo, useRef } from 'react';
 import { useMindMap } from './hooks/useMindMap';
 import { MindMapCanvas } from './components/MindMapCanvas';
-import type { RawNode, CommandId, NodeType, DataChangeCallback, DataChangeInfo, MindMapData, MindMapNodeData, ReviewStatusCode, ScoreInfo, ConnectorStyle, ValidationConfig, InteractionMode } from './types';
+import type { RawNode, CommandId, NodeType, DataChangeCallback, DataChangeInfo, MindMapData, MindMapNodeData, ReviewStatusCode, ScoreInfo, ConnectorStyle, ValidationConfig, InteractionMode, Remark } from './types';
 import { OperationType } from './types';
 import { createInitialMindMap } from './utils/createInitialMindMap';
 import { convertDataChangeInfo } from './utils/callbackDataConverter';
 import { getNodeChainByUuid } from './utils/dataChangeUtils';
 import { validateMindMap } from './utils/validation';
+import { convertSingleMindMapNodeToRawNode } from './utils/hierarchicalConverter';
 
 // Export Panel component and types for external use
 export { Panel } from './components/Panel';
 export type { PanelPosition } from './components/Panel';
-export type { RawNode, CommandId, NodeType, DataChangeCallback, DataChangeInfo, MindMapNodeData, ConnectorStyle, InteractionMode };
+export type { RawNode, CommandId, NodeType, DataChangeCallback, DataChangeInfo, MindMapNodeData, ConnectorStyle, InteractionMode, Remark };
 export { OperationType };
 
 
@@ -36,9 +37,10 @@ export interface AppRef {
   setReadOnly: (isReadOnly: boolean) => void;
   confirmReviewStatus: (nodeUuid: string, newStatus: ReviewStatusCode) => void;
   getReviewStatusUpdateInfo: (nodeUuid: string, newStatus: ReviewStatusCode) => DataChangeInfo | null;
-  confirmRemark: (nodeUuid: string, content: string) => void;
+  confirmRemark: (nodeUuid: string, content: string) => Remark | undefined;
   confirmScore: (nodeUuid: string, scoreInfo: ScoreInfo) => void;
   partialUpdateNodeData: (nodeUuid: string, partialData: Partial<MindMapNodeData>) => void;
+  getNode: (nodeUuid: string) => RawNode | undefined;
 }
 
 interface AppProps {
@@ -94,7 +96,7 @@ interface AppProps {
     enableInteractionModeSwitch?: boolean;
     interactionMode?: InteractionMode;
     onInteractionModeChange?: (mode: InteractionMode) => void;
-    onRemarkClick?: (nodeUuid: string) => void; // New prop
+    onRemarkClick?: (node: RawNode) => void; // Prop changed to receive RawNode
     children?: React.ReactNode;
 }
 
@@ -407,6 +409,16 @@ const App = forwardRef<AppRef, AppProps>(({
         onSubmitDefect(convertDataChangeInfo(info));
     }, [mindMap, onSubmitDefect]);
 
+    const handleRemarkClickWrapper = useCallback((nodeUuid: string) => {
+        if (onRemarkClick) {
+            const node = mindMap.nodes[nodeUuid];
+            const rawNode = convertSingleMindMapNodeToRawNode(node);
+            if (rawNode) {
+                onRemarkClick(rawNode);
+            }
+        }
+    }, [onRemarkClick, mindMap]);
+
     useImperativeHandle(ref, () => ({
         save: () => {
             const saveData = constructSavePayload();
@@ -449,7 +461,7 @@ const App = forwardRef<AppRef, AppProps>(({
             return getReviewStatusUpdateInfo(nodeUuid, newStatus);
         },
         confirmRemark: (nodeUuid: string, content: string) => {
-            confirmRemark(nodeUuid, content);
+            return confirmRemark(nodeUuid, content);
         },
         confirmScore: (nodeUuid: string, scoreInfo: ScoreInfo) => {
             confirmScore(nodeUuid, scoreInfo);
@@ -457,7 +469,11 @@ const App = forwardRef<AppRef, AppProps>(({
         partialUpdateNodeData: (nodeUuid: string, partialData: Partial<MindMapNodeData>) => {
             partialUpdateNode(nodeUuid, partialData);
         },
-    }), [constructSavePayload, enableUseCaseExecution, handleExecuteUseCase, handleSubmitDefect, enableDefectSubmission, resetHistory, confirmReviewStatus, getReviewStatusUpdateInfo, confirmRemark, confirmScore, partialUpdateNode, syncData]);
+        getNode: (nodeUuid: string) => {
+            const node = mindMap.nodes[nodeUuid];
+            return convertSingleMindMapNodeToRawNode(node);
+        }
+    }), [constructSavePayload, enableUseCaseExecution, handleExecuteUseCase, handleSubmitDefect, enableDefectSubmission, resetHistory, confirmReviewStatus, getReviewStatusUpdateInfo, confirmRemark, confirmScore, partialUpdateNode, syncData, mindMap]);
 
     const handleSaveRequest = () => {
         if (!performValidation(mindMap)) {
@@ -558,7 +574,7 @@ const App = forwardRef<AppRef, AppProps>(({
                 interactionMode={interactionMode}
                 onSetInteractionMode={handleSetInteractionMode}
                 enableInteractionModeSwitch={enableInteractionModeSwitch}
-                onRemarkClick={onRemarkClick}
+                onRemarkClick={handleRemarkClickWrapper}
             >
                 {children}
             </MindMapCanvas>

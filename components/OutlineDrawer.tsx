@@ -1,8 +1,9 @@
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { FiX, FiSearch, FiChevronRight, FiChevronDown, FiCircle } from 'react-icons/fi';
 import type { MindMapData, MindMapNodeData } from '../types';
 import { NODE_TYPE_PROPS } from '../constants';
+import { findAllAncestorUuids } from '../utils/findAllDescendantIds';
 
 interface OutlineDrawerProps {
     visible: boolean;
@@ -19,6 +20,7 @@ interface TreeNodeProps {
     depth: number;
     searchQuery: string;
     selectedUuid: string | null;
+    ancestors: Set<string>;
 }
 
 // Helper to check if a node or its descendants match the query
@@ -58,8 +60,9 @@ const getHighlightedText = (text: string, query: string): React.ReactNode => {
     );
 };
 
-const OutlineTreeNode: React.FC<TreeNodeProps> = ({ node, allNodes, onNodeClick, depth, searchQuery, selectedUuid }) => {
+const OutlineTreeNode: React.FC<TreeNodeProps> = ({ node, allNodes, onNodeClick, depth, searchQuery, selectedUuid, ancestors }) => {
     const [isExpanded, setIsExpanded] = useState(true);
+    const itemRef = useRef<HTMLDivElement>(null);
     
     const hasChildren = node.childNodeList && node.childNodeList.length > 0;
     const typeProps = NODE_TYPE_PROPS[node.nodeType || 'GENERAL'];
@@ -74,6 +77,23 @@ const OutlineTreeNode: React.FC<TreeNodeProps> = ({ node, allNodes, onNodeClick,
         onNodeClick(node.uuid!);
     };
 
+    // Auto-expand if in ancestor path of selected node
+    useEffect(() => {
+        if (node.uuid && ancestors.has(node.uuid)) {
+            setIsExpanded(true);
+        }
+    }, [ancestors, node.uuid]);
+
+    const isSelected = node.uuid === selectedUuid;
+
+    // Auto-scroll if selected
+    useEffect(() => {
+        if (isSelected && itemRef.current) {
+            // Using scrollIntoView to center the selected node in the drawer
+            itemRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+    }, [isSelected]);
+
     // Filter Logic:
     // If search query exists, only render if:
     // 1. Self matches
@@ -85,11 +105,10 @@ const OutlineTreeNode: React.FC<TreeNodeProps> = ({ node, allNodes, onNodeClick,
         return null;
     }
 
-    const isSelected = node.uuid === selectedUuid;
-
     return (
         <div className="outline-tree-node">
             <div 
+                ref={itemRef}
                 className={`outline-tree-node__content ${isSelected ? 'outline-tree-node__content--selected' : ''}`}
                 // Compact indentation: Reduced base padding and step size (12px instead of 16px)
                 style={{ paddingLeft: `${depth * 12 + 8}px` }}
@@ -125,6 +144,7 @@ const OutlineTreeNode: React.FC<TreeNodeProps> = ({ node, allNodes, onNodeClick,
                                 depth={depth + 1}
                                 searchQuery={searchQuery}
                                 selectedUuid={selectedUuid}
+                                ancestors={ancestors}
                             />
                         );
                     })}
@@ -140,6 +160,12 @@ export const OutlineDrawer: React.FC<OutlineDrawerProps> = ({ visible, mindMapDa
     const [width, setWidth] = useState(320); // Reduced default width
 
     const rootNode = mindMapData.nodes[mindMapData.rootUuid];
+
+    // Calculate ancestors for auto-expansion
+    const ancestors = useMemo(() => {
+        if (!currentSelectedNodeUuid) return new Set<string>();
+        return new Set(findAllAncestorUuids(mindMapData, currentSelectedNodeUuid));
+    }, [currentSelectedNodeUuid, mindMapData]);
 
     // Isolate native wheel events to prevent canvas zooming/panning
     useEffect(() => {
@@ -171,10 +197,6 @@ export const OutlineDrawer: React.FC<OutlineDrawerProps> = ({ visible, mindMapDa
         const startX = e.clientX;
         const startWidth = width;
         
-        // Use capture to ensure we receive events even if they occur over other elements (like iframes or outside window conceptually)
-        // Note: Browsers usually handle outside-window mouseup fine if started inside, but capture helps with hierarchy logic.
-        // However, standard dragging often puts the listener on window.
-        
         document.body.style.cursor = 'ew-resize';
         document.body.classList.add('canvas-interaction-no-select');
 
@@ -205,12 +227,11 @@ export const OutlineDrawer: React.FC<OutlineDrawerProps> = ({ visible, mindMapDa
             document.body.style.cursor = '';
             document.body.classList.remove('canvas-interaction-no-select');
             
-            // Remove with capture: true to match addition
             window.removeEventListener('mousemove', handleMouseMove, { capture: true });
             window.removeEventListener('mouseup', handleMouseUp, { capture: true });
         };
 
-        // Use capture phase to ensure we get the event before any stopPropagation in children could block it (though window listeners usually get bubbling, capture is safer for global drag)
+        // Use capture phase to ensure we get the event before any stopPropagation in children could block it
         window.addEventListener('mousemove', handleMouseMove, { capture: true });
         window.addEventListener('mouseup', handleMouseUp, { capture: true });
     };
@@ -265,6 +286,7 @@ export const OutlineDrawer: React.FC<OutlineDrawerProps> = ({ visible, mindMapDa
                         depth={0}
                         searchQuery={searchQuery}
                         selectedUuid={currentSelectedNodeUuid}
+                        ancestors={ancestors}
                     />
                 ) : (
                     <div className="outline-drawer__empty">暂无数据</div>

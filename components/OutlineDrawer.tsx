@@ -86,11 +86,30 @@ const OutlineTreeNode: React.FC<TreeNodeProps> = ({ node, allNodes, onNodeClick,
 
     const isSelected = node.uuid === selectedUuid;
 
-    // Auto-scroll if selected
+    // Auto-scroll if selected, BUT only if not currently visible
     useEffect(() => {
         if (isSelected && itemRef.current) {
-            // Using scrollIntoView to center the selected node in the drawer
-            itemRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            const el = itemRef.current;
+            const container = el.closest('.outline-drawer__content');
+
+            if (container) {
+                const elRect = el.getBoundingClientRect();
+                const containerRect = container.getBoundingClientRect();
+
+                // Check if element is fully vertically visible within the container
+                // We compare relative to the viewport
+                const isVisible = (
+                    elRect.top >= containerRect.top &&
+                    elRect.bottom <= containerRect.bottom
+                );
+
+                if (!isVisible) {
+                    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
+            } else {
+                // Fallback if container logic fails
+                el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
         }
     }, [isSelected]);
 

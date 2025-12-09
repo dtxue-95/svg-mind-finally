@@ -1,4 +1,5 @@
-import React, { useRef, useEffect } from 'react';
+
+import React, { useRef, useEffect, useState } from 'react';
 import { FaWindows, FaApple } from 'react-icons/fa6';
 import { FiX } from 'react-icons/fi';
 
@@ -26,6 +27,7 @@ const shortcuts = [
 
 export const ShortcutsPanel: React.FC<ShortcutsPanelProps> = ({ visible, onClose }) => {
     const drawerRef = useRef<HTMLDivElement>(null);
+    const [width, setWidth] = useState(400); // Default width
 
     // Isolate native wheel events to prevent canvas zooming/panning
     useEffect(() => {
@@ -49,11 +51,52 @@ export const ShortcutsPanel: React.FC<ShortcutsPanelProps> = ({ visible, onClose
         e.stopPropagation();
     };
 
+    // Resizing Logic (Closure-based)
+    const handleMouseDown = (e: React.MouseEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        
+        const startX = e.clientX;
+        const startWidth = width;
+        
+        document.body.style.cursor = 'ew-resize';
+        document.body.classList.add('canvas-interaction-no-select');
+
+        const handleMouseMove = (moveEvent: MouseEvent) => {
+            // Failsafe: If mouse button is not pressed, stop dragging
+            if (moveEvent.buttons === 0) {
+                cleanup();
+                return;
+            }
+
+            moveEvent.preventDefault();
+            const deltaX = startX - moveEvent.clientX; // Dragging left increases width
+            const newWidth = Math.max(300, Math.min(window.innerWidth - 100, startWidth + deltaX));
+            setWidth(newWidth);
+        };
+
+        const handleMouseUp = (upEvent: MouseEvent) => {
+            upEvent.preventDefault();
+            cleanup();
+        };
+
+        const cleanup = () => {
+            document.body.style.cursor = '';
+            document.body.classList.remove('canvas-interaction-no-select');
+            window.removeEventListener('mousemove', handleMouseMove, { capture: true });
+            window.removeEventListener('mouseup', handleMouseUp, { capture: true });
+        };
+
+        window.addEventListener('mousemove', handleMouseMove, { capture: true });
+        window.addEventListener('mouseup', handleMouseUp, { capture: true });
+    };
+
     return (
         <div 
             ref={drawerRef}
             className={`remark-drawer ${visible ? 'visible' : ''}`}
             style={{ 
+                width: `${width}px`,
                 boxShadow: visible ? '-5px 0 25px rgba(0, 0, 0, 0.15)' : 'none',
                 pointerEvents: visible ? 'all' : 'none',
                 zIndex: 3002 // Slightly higher than outline/remark drawers if needed
@@ -65,6 +108,9 @@ export const ShortcutsPanel: React.FC<ShortcutsPanelProps> = ({ visible, onClose
             onKeyDown={stopPropagation}
             onKeyUp={stopPropagation}
         >
+             {/* Resize Handle */}
+             <div className="drawer-resize-handle" onMouseDown={handleMouseDown} />
+
              <div className="remark-drawer__header">
                 <h3>快捷键</h3>
                 <button className="remark-drawer__close-btn" onClick={onClose} title="关闭">

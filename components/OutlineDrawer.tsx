@@ -9,6 +9,7 @@ interface OutlineDrawerProps {
     mindMapData: MindMapData;
     onClose: () => void;
     onNodeClick: (nodeUuid: string) => void;
+    currentSelectedNodeUuid: string | null;
 }
 
 interface TreeNodeProps {
@@ -17,6 +18,7 @@ interface TreeNodeProps {
     onNodeClick: (nodeUuid: string) => void;
     depth: number;
     searchQuery: string;
+    selectedUuid: string | null;
 }
 
 // Helper to check if a node or its descendants match the query
@@ -56,7 +58,7 @@ const getHighlightedText = (text: string, query: string): React.ReactNode => {
     );
 };
 
-const OutlineTreeNode: React.FC<TreeNodeProps> = ({ node, allNodes, onNodeClick, depth, searchQuery }) => {
+const OutlineTreeNode: React.FC<TreeNodeProps> = ({ node, allNodes, onNodeClick, depth, searchQuery, selectedUuid }) => {
     const [isExpanded, setIsExpanded] = useState(true);
     
     const hasChildren = node.childNodeList && node.childNodeList.length > 0;
@@ -83,11 +85,14 @@ const OutlineTreeNode: React.FC<TreeNodeProps> = ({ node, allNodes, onNodeClick,
         return null;
     }
 
+    const isSelected = node.uuid === selectedUuid;
+
     return (
         <div className="outline-tree-node">
             <div 
-                className="outline-tree-node__content" 
-                style={{ paddingLeft: `${depth * 16 + 12}px` }}
+                className={`outline-tree-node__content ${isSelected ? 'outline-tree-node__content--selected' : ''}`}
+                // Compact indentation: Reduced base padding and step size (12px instead of 16px)
+                style={{ paddingLeft: `${depth * 12 + 8}px` }}
                 onClick={handleClick}
             >
                 <div 
@@ -98,7 +103,7 @@ const OutlineTreeNode: React.FC<TreeNodeProps> = ({ node, allNodes, onNodeClick,
                 </div>
                 
                 <div className="outline-tree-node__icon" style={{ color: typeProps?.color || '#555' }}>
-                    <FiCircle fill={typeProps?.backgroundColor || '#eee'} size={10} />
+                    <FiCircle fill={typeProps?.backgroundColor || '#eee'} size={8} />
                 </div>
 
                 <span className="outline-tree-node__text">
@@ -119,6 +124,7 @@ const OutlineTreeNode: React.FC<TreeNodeProps> = ({ node, allNodes, onNodeClick,
                                 onNodeClick={onNodeClick}
                                 depth={depth + 1}
                                 searchQuery={searchQuery}
+                                selectedUuid={selectedUuid}
                             />
                         );
                     })}
@@ -128,14 +134,14 @@ const OutlineTreeNode: React.FC<TreeNodeProps> = ({ node, allNodes, onNodeClick,
     );
 };
 
-export const OutlineDrawer: React.FC<OutlineDrawerProps> = ({ visible, mindMapData, onClose, onNodeClick }) => {
+export const OutlineDrawer: React.FC<OutlineDrawerProps> = ({ visible, mindMapData, onClose, onNodeClick, currentSelectedNodeUuid }) => {
     const [searchQuery, setSearchQuery] = useState('');
     const drawerRef = useRef<HTMLDivElement>(null);
+    const [width, setWidth] = useState(320); // Reduced default width
 
     const rootNode = mindMapData.nodes[mindMapData.rootUuid];
 
     // Isolate native wheel events to prevent canvas zooming/panning
-    // React's onWheel is not sufficient because the parent Canvas has a non-passive native listener.
     useEffect(() => {
         const drawer = drawerRef.current;
         if (!drawer) return;
@@ -157,6 +163,58 @@ export const OutlineDrawer: React.FC<OutlineDrawerProps> = ({ visible, mindMapDa
         e.stopPropagation();
     };
 
+    // Resizing Logic (Closure-based to prevent stale references)
+    const handleMouseDown = (e: React.MouseEvent) => {
+        e.preventDefault();
+        e.stopPropagation(); 
+        
+        const startX = e.clientX;
+        const startWidth = width;
+        
+        // Use capture to ensure we receive events even if they occur over other elements (like iframes or outside window conceptually)
+        // Note: Browsers usually handle outside-window mouseup fine if started inside, but capture helps with hierarchy logic.
+        // However, standard dragging often puts the listener on window.
+        
+        document.body.style.cursor = 'ew-resize';
+        document.body.classList.add('canvas-interaction-no-select');
+
+        // Check button state to prevent sticky drag
+        const checkButtons = (e: MouseEvent) => {
+             if (e.buttons === 0) {
+                 cleanup();
+                 return false;
+             }
+             return true;
+        };
+
+        const handleMouseMove = (moveEvent: MouseEvent) => {
+            if (!checkButtons(moveEvent)) return;
+
+            moveEvent.preventDefault();
+            const deltaX = startX - moveEvent.clientX; // Dragging left increases width (right-anchored drawer)
+            const newWidth = Math.max(250, Math.min(window.innerWidth - 50, startWidth + deltaX));
+            setWidth(newWidth);
+        };
+
+        const handleMouseUp = (upEvent: MouseEvent) => {
+            upEvent.preventDefault();
+            cleanup();
+        };
+
+        const cleanup = () => {
+            document.body.style.cursor = '';
+            document.body.classList.remove('canvas-interaction-no-select');
+            
+            // Remove with capture: true to match addition
+            window.removeEventListener('mousemove', handleMouseMove, { capture: true });
+            window.removeEventListener('mouseup', handleMouseUp, { capture: true });
+        };
+
+        // Use capture phase to ensure we get the event before any stopPropagation in children could block it (though window listeners usually get bubbling, capture is safer for global drag)
+        window.addEventListener('mousemove', handleMouseMove, { capture: true });
+        window.addEventListener('mouseup', handleMouseUp, { capture: true });
+    };
+
     return (
         <div 
             ref={drawerRef}
@@ -168,21 +226,23 @@ export const OutlineDrawer: React.FC<OutlineDrawerProps> = ({ visible, mindMapDa
             onKeyDown={stopPropagation}
             onKeyUp={stopPropagation}
             style={{ 
-                // Ensure the drawer has a shadow since we removed the overlay
+                width: `${width}px`,
                 boxShadow: visible ? '-5px 0 25px rgba(0, 0, 0, 0.15)' : 'none',
-                // Enable pointer events on the drawer itself
                 pointerEvents: visible ? 'all' : 'none' 
             }}
         >
+            {/* Resize Handle */}
+            <div className="drawer-resize-handle" onMouseDown={handleMouseDown} />
+
             <div className="remark-drawer__header">
                 <h3>大纲</h3>
                 <button className="remark-drawer__close-btn" onClick={onClose}>
-                    <FiX size={20} />
+                    <FiX size={18} />
                 </button>
             </div>
             
             <div className="outline-drawer__search">
-                <FiSearch className="outline-drawer__search-icon" />
+                <FiSearch className="outline-drawer__search-icon" size={14} />
                 <input 
                     type="text" 
                     placeholder="搜索大纲..." 
@@ -191,7 +251,7 @@ export const OutlineDrawer: React.FC<OutlineDrawerProps> = ({ visible, mindMapDa
                 />
                 {searchQuery && (
                     <button className="outline-drawer__clear-search" onClick={() => setSearchQuery('')}>
-                        <FiX size={14} />
+                        <FiX size={12} />
                     </button>
                 )}
             </div>
@@ -204,6 +264,7 @@ export const OutlineDrawer: React.FC<OutlineDrawerProps> = ({ visible, mindMapDa
                         onNodeClick={onNodeClick}
                         depth={0}
                         searchQuery={searchQuery}
+                        selectedUuid={currentSelectedNodeUuid}
                     />
                 ) : (
                     <div className="outline-drawer__empty">暂无数据</div>

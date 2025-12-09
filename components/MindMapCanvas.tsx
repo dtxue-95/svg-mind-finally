@@ -47,24 +47,24 @@ const ReadOnlyToggle: React.FC<ReadOnlyToggleProps> = ({ isReadOnly, onToggleRea
     };
 
     return (
-        <div className="readonly-toggle">
+        <>
             <button
-                className={`readonly-toggle__button ${isReadOnly ? 'readonly-toggle__button--active' : ''}`}
+                className={`canvas-control-button ${isReadOnly ? 'active' : ''}`}
                 onClick={handleSetReadOnly}
                 title="只读模式"
             >
                 <FiEye />
-                只读模式
+                只读
             </button>
             <button
-                className={`readonly-toggle__button ${!isReadOnly ? 'readonly-toggle__button--active' : ''}`}
+                className={`canvas-control-button ${!isReadOnly ? 'active' : ''}`}
                 onClick={handleSetEditable}
                 title="编辑模式"
             >
                 <FiEdit2 />
-                编辑模式
+                编辑
             </button>
-        </div>
+        </>
     );
 };
 
@@ -1288,6 +1288,10 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
         dispatch({ type: 'SET_TRANSFORM', payload: newTransform });
     }, [mindMapData.nodes]);
 
+    const handleToggleOutlineDrawer = useCallback(() => {
+        setIsOutlineDrawerVisible(prev => !prev);
+    }, []);
+
     return (
         <div 
             className={`mind-map-canvas ${showBackgroundDots ? 'mind-map-canvas--with-dots' : ''}`}
@@ -1300,23 +1304,33 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
                 backgroundColor: canvasBackgroundColor
             }}
         >
-            <div className="top-right-controls">
+            <div className="canvas-controls-top-left">
+                {showReadOnlyToggleButtons && (
+                    <ReadOnlyToggle isReadOnly={isReadOnly} onToggleReadOnly={onToggleReadOnly} />
+                )}
+                
+                {showReadOnlyToggleButtons && (enableOutline || showShortcutsButton) && (
+                    <div className="canvas-control-separator" />
+                )}
+
                 {enableOutline && (
                     <button 
-                        className="shortcuts-toggle-button" 
-                        onClick={() => setIsOutlineDrawerVisible(true)} 
+                        className={`canvas-control-button ${isOutlineDrawerVisible ? 'active' : ''}`}
+                        onClick={handleToggleOutlineDrawer} 
                         title="大纲"
                     >
                         <FiList /> 大纲
                     </button>
                 )}
                 {showShortcutsButton && (
-                    <button ref={shortcutsButtonRef} className="shortcuts-toggle-button" onClick={handleToggleShortcutsPanel} title="快捷键">
+                    <button 
+                        ref={shortcutsButtonRef} 
+                        className={`canvas-control-button ${isShortcutsPanelVisible ? 'active' : ''}`}
+                        onClick={handleToggleShortcutsPanel} 
+                        title="快捷键"
+                    >
                         <FiCommand /> 快捷键
                     </button>
-                )}
-                {showReadOnlyToggleButtons && (
-                    <ReadOnlyToggle isReadOnly={isReadOnly} onToggleReadOnly={onToggleReadOnly} />
                 )}
             </div>
 
@@ -1618,6 +1632,7 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
                 mindMapData={mindMapData}
                 onClose={() => setIsOutlineDrawerVisible(false)}
                 onNodeClick={handleOutlineNodeClick}
+                currentSelectedNodeUuid={selectedNodeUuid}
             />
 
             {activePopup.type === 'review' && activePopupNode && (

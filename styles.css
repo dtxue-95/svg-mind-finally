@@ -927,96 +927,68 @@ foreignObject[data-dragging='true'] {
   cursor: grabbing;
 }
 
-/* === Top Right Controls === */
-.top-right-controls {
+/* === Top Left Controls (Unified) === */
+.canvas-controls-top-left {
   position: absolute;
   top: 20px;
-  right: 20px;
+  left: 20px;
   z-index: 10;
   display: flex;
-  gap: 8px;
   align-items: center;
+  background-color: #fff;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  border: 1px solid #e8e8e8;
+  padding: 2px;
   pointer-events: all;
 }
 
-.shortcuts-toggle-button {
+.canvas-control-button {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 0 12px;
-  height: 40px;
-  border: 1px solid #e8e8e8;
-  background-color: var(--toolbar-background);
-  border-radius: 8px;
-  font-size: 14px;
-  font-weight: 500;
-  color: #555;
-  cursor: pointer;
-  transition: background-color 0.2s, color 0.2s, box-shadow 0.2s;
-  white-space: nowrap;
-  box-shadow: 0 2px 8px var(--shadow-color);
-}
-
-.shortcuts-toggle-button:hover {
-  background-color: rgba(0, 0, 0, 0.05);
-  border-color: #d0d0d0;
-}
-
-.shortcuts-toggle-button svg {
-  width: 16px;
-  height: 16px;
-}
-
-.readonly-toggle {
-  position: relative;
-  z-index: auto;
-  display: flex;
-  background-color: var(--toolbar-background);
-  border-radius: 8px;
-  box-shadow: 0 2px 8px var(--shadow-color);
-  padding: 4px;
-  pointer-events: all;
-  border: 1px solid #e8e8e8;
-}
-
-.readonly-toggle__button {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 12px;
+  padding: 4px 10px; /* Reduced padding */
   border: none;
   background-color: transparent;
   border-radius: 6px;
-  font-size: 14px;
+  font-size: 13px; /* Reduced font size */
   font-weight: 500;
   color: #555;
   cursor: pointer;
   transition: background-color 0.2s, color 0.2s;
+  height: 32px; /* Fixed height for consistency */
   white-space: nowrap;
 }
 
-.readonly-toggle__button svg {
-    width: 16px;
-    height: 16px;
-}
-
-.readonly-toggle__button:hover:not(.readonly-toggle__button--active) {
+.canvas-control-button:hover {
   background-color: rgba(0, 0, 0, 0.05);
 }
 
-.readonly-toggle__button--active {
-  background-color: #007aff;
-  color: white;
+.canvas-control-button svg {
+  width: 14px;
+  height: 14px;
+}
+
+.canvas-control-button.active {
+  background-color: #e6f0ff;
+  color: #007aff;
+  font-weight: 600;
+}
+
+.canvas-control-separator {
+  width: 1px;
+  height: 16px;
+  background-color: #eee;
+  margin: 0 2px;
 }
 
 
-/* === Shortcuts Panel (Table Layout inside Drawer) === */
-/* Removed old popover container styles, keeping row/column styles for drawer content */
+/* === Shortcuts Panel (Compact Table Layout) === */
 
 .shortcuts-panel__row {
   display: flex;
   align-items: center;
-  padding: 8px 0;
+  padding: 6px 0; /* Reduced padding */
   border-bottom: 1px solid #f0f0f0;
 }
 
@@ -1027,15 +999,15 @@ foreignObject[data-dragging='true'] {
 .shortcuts-panel__table-header {
   font-weight: 500;
   color: #666;
-  font-size: 13px;
-  padding-bottom: 10px;
+  font-size: 12px; /* Reduced font size */
+  padding-bottom: 8px;
 }
 
 .shortcuts-panel__col-func {
   flex: 2;
   min-width: 110px;
   padding-right: 8px;
-  font-size: 14px;
+  font-size: 13px; /* Reduced font size */
   color: #333;
 }
 
@@ -1045,7 +1017,7 @@ foreignObject[data-dragging='true'] {
   align-items: center;
   flex-wrap: wrap;
   gap: 6px;
-  font-size: 13px;
+  font-size: 12px; /* Reduced font size */
 }
 
 .shortcuts-panel__col-key svg {
@@ -1055,18 +1027,15 @@ foreignObject[data-dragging='true'] {
   height: 14px;
 }
 
-.shortcuts-panel__col-key kbd { /* Updated selector to be more specific if needed, or rely on global tag style below */
-}
-
 /* Global KBD style used in shortcuts panel */
 kbd {
   background-color: #f0f1f2;
   border: 1px solid #d9d9d9;
   border-bottom-width: 2px;
   border-radius: 4px;
-  padding: 2px 6px;
+  padding: 1px 5px; /* Reduced padding */
   font-family: inherit;
-  font-size: 12px;
+  font-size: 11px; /* Reduced font size */
   box-shadow: none;
   white-space: nowrap;
 }
@@ -1605,13 +1574,13 @@ kbd {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 16px 20px;
+  padding: 12px 16px; /* Compact Padding */
   border-bottom: 1px solid #f0f0f0;
 }
 
 .remark-drawer__header h3 {
   margin: 0;
-  font-size: 18px;
+  font-size: 16px; /* Compact Font */
   font-weight: 600;
   color: #333;
 }
@@ -1755,7 +1724,7 @@ kbd {
 }
 
 .outline-drawer__search {
-    padding: 12px 16px;
+    padding: 8px 12px; /* Compact Padding */
     border-bottom: 1px solid #f0f0f0;
     display: flex;
     align-items: center;
@@ -1773,7 +1742,7 @@ kbd {
     flex: 1;
     border: none;
     outline: none;
-    font-size: 14px;
+    font-size: 13px; /* Compact Font */
     background: transparent;
     color: #333;
 }
@@ -1815,7 +1784,7 @@ kbd {
 .outline-tree-node__content {
     display: flex;
     align-items: center;
-    padding: 6px 12px;
+    padding: 4px 8px; /* Compact Padding */
     cursor: pointer;
     transition: background-color 0.2s;
     user-select: none;
@@ -1825,9 +1794,19 @@ kbd {
     background-color: #f0f0f0;
 }
 
+/* Selected node highlighting in outline */
+.outline-tree-node__content--selected {
+    background-color: #e6f7ff !important;
+}
+
+.outline-tree-node__content--selected .outline-tree-node__text {
+    color: #007aff;
+    font-weight: 500;
+}
+
 .outline-tree-node__toggle {
-    width: 20px;
-    height: 20px;
+    width: 16px; /* Compact Size */
+    height: 16px; /* Compact Size */
     display: flex;
     align-items: center;
     justify-content: center;
@@ -1836,6 +1815,7 @@ kbd {
     cursor: pointer;
     border-radius: 4px;
     transition: background-color 0.2s;
+    font-size: 12px; /* Smaller Icon */
 }
 
 .outline-tree-node__toggle:hover {
@@ -1854,7 +1834,7 @@ kbd {
 }
 
 .outline-tree-node__text {
-    font-size: 14px;
+    font-size: 13px; /* Compact Font */
     color: #333;
     white-space: nowrap;
     overflow: hidden;
@@ -1866,4 +1846,21 @@ kbd {
     color: #ff3b30; /* Red */
     font-weight: 600;
     background-color: transparent;
+}
+
+/* === Drawer Resize Handle === */
+.drawer-resize-handle {
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 6px;
+    cursor: ew-resize;
+    z-index: 10;
+    background-color: transparent;
+    transition: background-color 0.2s;
+}
+
+.drawer-resize-handle:hover {
+    background-color: rgba(0, 0, 0, 0.1);
 }

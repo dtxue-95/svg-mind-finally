@@ -367,22 +367,25 @@ const MindMapNodeComponent: React.FC<MindMapNodeProps> = ({
     const shouldRenderReviewIcons = !!node.id && (showReviewStatus || showRemarkIcon || showScoreInfo);
 
     const handleReviewIconClick = (e: React.MouseEvent) => {
-        e.stopPropagation(); // Prevent node selection
+        e.stopPropagation();
         if (node.uuid) {
+            onSelect(node.uuid); // Also select the node
             onOpenReviewContextMenu(node.uuid, e);
         }
     };
     
     const handleRemarkIconClick = (e: React.MouseEvent) => {
-        e.stopPropagation(); // Prevent node selection
+        e.stopPropagation();
         if (node.uuid) {
+            onSelect(node.uuid); // Also select the node
             onOpenRemarkModal(node.uuid, e);
         }
     };
 
     const handleScoreIconClick = (e: React.MouseEvent) => {
-        e.stopPropagation(); // Prevent node selection
+        e.stopPropagation();
         if (node.uuid) {
+            onSelect(node.uuid); // Also select the node
             onOpenScoreModal(node.uuid, e);
         }
     };

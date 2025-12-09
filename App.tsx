@@ -97,6 +97,7 @@ interface AppProps {
     interactionMode?: InteractionMode;
     onInteractionModeChange?: (mode: InteractionMode) => void;
     onRemarkClick?: (node: RawNode) => void; // Prop changed to receive RawNode
+    enableOutline?: boolean; // New prop for toggling Outline feature
     children?: React.ReactNode;
 }
 
@@ -154,6 +155,7 @@ const App = forwardRef<AppRef, AppProps>(({
     interactionMode: interactionModeProp,
     onInteractionModeChange,
     onRemarkClick,
+    enableOutline = false,
     children,
 }, ref) => {
     // State to hold the data for the mind map. Initialized from props.
@@ -575,6 +577,7 @@ const App = forwardRef<AppRef, AppProps>(({
                 onSetInteractionMode={handleSetInteractionMode}
                 enableInteractionModeSwitch={enableInteractionModeSwitch}
                 onRemarkClick={handleRemarkClickWrapper}
+                enableOutline={enableOutline}
             >
                 {children}
             </MindMapCanvas>

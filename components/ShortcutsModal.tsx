@@ -1,9 +1,9 @@
-import React from 'react';
+import React, { useRef, useEffect } from 'react';
 import { FaWindows, FaApple } from 'react-icons/fa6';
 import { FiX } from 'react-icons/fi';
 
 interface ShortcutsPanelProps {
-    position: { top: number; right: number };
+    visible: boolean;
     onClose: () => void;
 }
 
@@ -24,22 +24,54 @@ const shortcuts = [
     { func: '编辑模式', win: 'Shift + W', mac: 'Shift + W' },
 ];
 
-export const ShortcutsPanel: React.FC<ShortcutsPanelProps> = ({ position, onClose }) => {
-    const handleWheel = (e: React.WheelEvent) => {
-        // Stop the wheel event from bubbling up to the canvas,
-        // which would otherwise cause the canvas to zoom.
+export const ShortcutsPanel: React.FC<ShortcutsPanelProps> = ({ visible, onClose }) => {
+    const drawerRef = useRef<HTMLDivElement>(null);
+
+    // Isolate native wheel events to prevent canvas zooming/panning
+    useEffect(() => {
+        const drawer = drawerRef.current;
+        if (!drawer) return;
+
+        const handleNativeWheel = (e: WheelEvent) => {
+            e.stopPropagation();
+        };
+
+        // Attach native listener to stop propagation to the parent canvas
+        drawer.addEventListener('wheel', handleNativeWheel, { passive: false });
+
+        return () => {
+            drawer.removeEventListener('wheel', handleNativeWheel);
+        };
+    }, []);
+
+    // Stop propagation for React synthetic events to prevent canvas interaction (drag/select)
+    const stopPropagation = (e: React.SyntheticEvent) => {
         e.stopPropagation();
     };
 
     return (
-        <div className="shortcuts-panel" style={{ top: position.top, right: position.right }} onWheel={handleWheel}>
-             <div className="shortcuts-panel__header">
+        <div 
+            ref={drawerRef}
+            className={`remark-drawer ${visible ? 'visible' : ''}`}
+            style={{ 
+                boxShadow: visible ? '-5px 0 25px rgba(0, 0, 0, 0.15)' : 'none',
+                pointerEvents: visible ? 'all' : 'none',
+                zIndex: 3002 // Slightly higher than outline/remark drawers if needed
+            }}
+            onMouseDown={stopPropagation}
+            onMouseUp={stopPropagation}
+            onClick={stopPropagation}
+            onDoubleClick={stopPropagation}
+            onKeyDown={stopPropagation}
+            onKeyUp={stopPropagation}
+        >
+             <div className="remark-drawer__header">
                 <h3>快捷键</h3>
-                <button className="shortcuts-panel__close-button" onClick={onClose} title="关闭">
-                    <FiX size={18} />
+                <button className="remark-drawer__close-btn" onClick={onClose} title="关闭">
+                    <FiX size={20} />
                 </button>
             </div>
-            <div className="shortcuts-panel__content">
+            <div className="remark-drawer__content">
                 <div className="shortcuts-panel__row shortcuts-panel__table-header">
                     <div className="shortcuts-panel__col-func">功能</div>
                     <div className="shortcuts-panel__col-key"><FaWindows /> Windows</div>
@@ -61,5 +93,4 @@ export const ShortcutsPanel: React.FC<ShortcutsPanelProps> = ({ position, onClos
     );
 };
 
-// The component was renamed internally, but the file keeps its name for the change.
 export { ShortcutsPanel as ShortcutsModal };

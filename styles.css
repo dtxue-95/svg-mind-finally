@@ -1,5 +1,4 @@
 
-
 /* === Root Variables === */
 :root {
   --background-color: #f7f7f7;
@@ -1011,79 +1010,8 @@ foreignObject[data-dragging='true'] {
 }
 
 
-/* === Shortcuts Panel (Popover) === */
-@keyframes fadeInPopover {
-  from { opacity: 0; transform: translateY(-5px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-.shortcuts-panel {
-  position: absolute;
-  z-index: 1001;
-  background-color: #fff;
-  border-radius: 12px;
-  box-shadow: 0 5px 25px rgba(0, 0, 0, 0.15);
-  width: 90%;
-  max-width: 560px;
-  overflow: hidden;
-  animation: fadeInPopover 0.15s ease-out;
-  border: 1px solid #e8e8e8;
-  pointer-events: all;
-}
-
-.shortcuts-panel::before {
-  content: '';
-  position: absolute;
-  top: -8px;
-  right: 60px; /* Adjust to align with button center */
-  width: 16px;
-  height: 16px;
-  background-color: #fff;
-  border-top: 1px solid #e8e8e8;
-  border-left: 1px solid #e8e8e8;
-  transform: rotate(45deg);
-  z-index: -1;
-}
-
-.shortcuts-panel__header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 12px 16px;
-  border-bottom: 1px solid #e8e8e8;
-}
-
-.shortcuts-panel__header h3 {
-  margin: 0;
-  font-size: 16px;
-  font-weight: 600;
-  color: #333;
-}
-
-.shortcuts-panel__close-button {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  background: none;
-  border: none;
-  border-radius: 50%;
-  cursor: pointer;
-  padding: 0;
-  transition: background-color 0.2s;
-  color: #6c757d;
-}
-
-.shortcuts-panel__close-button:hover {
-  background-color: #f0f0f0;
-}
-
-.shortcuts-panel__content {
-  padding: 4px 16px 16px;
-  max-height: 60vh;
-  overflow-y: auto;
-}
+/* === Shortcuts Panel (Table Layout inside Drawer) === */
+/* Removed old popover container styles, keeping row/column styles for drawer content */
 
 .shortcuts-panel__row {
   display: flex;
@@ -1127,7 +1055,11 @@ foreignObject[data-dragging='true'] {
   height: 14px;
 }
 
-.shortcuts-panel__content kbd {
+.shortcuts-panel__col-key kbd { /* Updated selector to be more specific if needed, or rely on global tag style below */
+}
+
+/* Global KBD style used in shortcuts panel */
+kbd {
   background-color: #f0f1f2;
   border: 1px solid #d9d9d9;
   border-bottom-width: 2px;
@@ -1815,4 +1747,123 @@ foreignObject[data-dragging='true'] {
 .remark-drawer__btn--save:disabled {
   background-color: #ccc;
   cursor: not-allowed;
+}
+
+/* === Outline Drawer Styles === */
+.outline-drawer {
+    background-color: #fcfcfc;
+}
+
+.outline-drawer__search {
+    padding: 12px 16px;
+    border-bottom: 1px solid #f0f0f0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    position: relative;
+    background-color: #fff;
+}
+
+.outline-drawer__search-icon {
+    color: #999;
+    flex-shrink: 0;
+}
+
+.outline-drawer__search input {
+    flex: 1;
+    border: none;
+    outline: none;
+    font-size: 14px;
+    background: transparent;
+    color: #333;
+}
+
+.outline-drawer__search input::placeholder {
+    color: #bbb;
+}
+
+.outline-drawer__clear-search {
+    background: #eee;
+    border: none;
+    border-radius: 50%;
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    color: #666;
+    padding: 0;
+}
+
+.outline-drawer__content {
+    padding: 8px 0;
+}
+
+.outline-drawer__empty {
+    padding: 20px;
+    text-align: center;
+    color: #999;
+    font-size: 14px;
+}
+
+.outline-tree-node {
+    display: flex;
+    flex-direction: column;
+}
+
+.outline-tree-node__content {
+    display: flex;
+    align-items: center;
+    padding: 6px 12px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+    user-select: none;
+}
+
+.outline-tree-node__content:hover {
+    background-color: #f0f0f0;
+}
+
+.outline-tree-node__toggle {
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-right: 4px;
+    color: #999;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: background-color 0.2s;
+}
+
+.outline-tree-node__toggle:hover {
+    background-color: #e6e6e6;
+    color: #666;
+}
+
+.outline-tree-node__toggle.hidden {
+    visibility: hidden;
+}
+
+.outline-tree-node__icon {
+    margin-right: 8px;
+    display: flex;
+    align-items: center;
+}
+
+.outline-tree-node__text {
+    font-size: 14px;
+    color: #333;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Match highlight style */
+.outline-search-match {
+    color: #ff3b30; /* Red */
+    font-weight: 600;
+    background-color: transparent;
 }

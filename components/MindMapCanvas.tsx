@@ -1,6 +1,4 @@
 
-
-
 import React, { useCallback, useRef, useEffect, useReducer, useMemo, useState } from 'react';
 import type { MindMapData, CommandId, MindMapNodeData, NodeType, NodePriority, DataChangeCallback, CanvasTransform, ReviewStatusCode, ScoreInfo, ConnectorStyle, InteractionMode } from '../types';
 import { MindMapNode } from './MindMapNode';
@@ -14,6 +12,7 @@ import { Minimap } from './Minimap';
 import { ShortcutsModal as ShortcutsPanel } from './ShortcutsModal';
 import { ReviewMenu } from './ReviewStatusModal';
 import { ScoreModal } from './ScoreModal';
+import { OutlineDrawer } from './OutlineDrawer';
 import { generateElbowPath } from '../utils/generateElbowPath';
 import { generateCurvePath } from '../utils/generateCurvePath';
 import { canvasReducer } from '../state/canvasReducer';
@@ -24,7 +23,7 @@ import { OperationType } from '../types';
 import { getNodeChainByUuid } from '../utils/dataChangeUtils';
 import { convertDataChangeInfo } from '../utils/callbackDataConverter';
 import { HORIZONTAL_SPACING, VERTICAL_SPACING } from '../constants';
-import { FiEye, FiEdit2, FiCommand } from 'react-icons/fi';
+import { FiEye, FiEdit2, FiCommand, FiList } from 'react-icons/fi';
 import { Toast } from './Toast';
 import { filterSelectedNodesForCopy } from '../utils/treeUtils';
 
@@ -163,6 +162,7 @@ interface MindMapCanvasProps {
     onSetInteractionMode: (mode: InteractionMode) => void;
     enableInteractionModeSwitch: boolean;
     onRemarkClick?: (nodeUuid: string) => void; // New prop for external remark handling
+    enableOutline: boolean; // New prop
 }
 
 const SvgPath = React.memo(({ d, className }: { d: string, className: string }) => {
@@ -180,7 +180,7 @@ const AUTO_PAN_SPEED = 10;
 
 export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
     mindMapData, onAddChildNode, onAddSiblingNode, onDeleteNode, onFinishEditing, onUpdateNodePosition, onReparentNode, onReorderNode, onLayout, onUpdateNodeSize, onSave, showAITag, isDraggable = false, enableStrictDrag = false, enableNodeReorder = true, reorderableNodeTypes, showNodeType, showPriority, onToggleCollapse, onExpandNodes, onExpandAllNodes, onCollapseAllNodes, onExpandToLevel, onCollapseToLevel, onUpdateNodeType, onUpdateNodePriority, onConfirmReviewStatus, onConfirmRemark, onConfirmScore, onSubmitDefect,
-    onUndo, onRedo, canUndo, canRedo, showTopToolbar, showBottomToolbar, topToolbarCommands, bottomToolbarCommands, strictMode = false, showContextMenu = true, showCanvasContextMenu = true, priorityEditableNodeTypes, onDataChange, onExecuteUseCase, enableUseCaseExecution, enableDefectSubmission, canvasBackgroundColor, showBackgroundDots, showMinimap, getNodeBackgroundColor, enableReadOnlyUseCaseExecution, enableExpandCollapseByLevel, isReadOnly, onToggleReadOnly, onSetReadOnly, isDirty, children, newlyAddedNodeUuid, onNodeFocused, showReadOnlyToggleButtons, showShortcutsButton, enableReviewStatus, enableNodeRemarks, enableNodeScoring, reviewStatusNodeTypes, nodeRemarksNodeTypes, nodeScoringNodeTypes, enableBulkReviewContextMenu, enableSingleReviewContextMenu, connectorStyle, toast, onCloseToast, enableRangeSelection, onPasteNodes, enableNodeCopy = true, interactionMode, onSetInteractionMode, enableInteractionModeSwitch, onRemarkClick
+    onUndo, onRedo, canUndo, canRedo, showTopToolbar, showBottomToolbar, topToolbarCommands, bottomToolbarCommands, strictMode = false, showContextMenu = true, showCanvasContextMenu = true, priorityEditableNodeTypes, onDataChange, onExecuteUseCase, enableUseCaseExecution, enableDefectSubmission, canvasBackgroundColor, showBackgroundDots, showMinimap, getNodeBackgroundColor, enableReadOnlyUseCaseExecution, enableExpandCollapseByLevel, isReadOnly, onToggleReadOnly, onSetReadOnly, isDirty, children, newlyAddedNodeUuid, onNodeFocused, showReadOnlyToggleButtons, showShortcutsButton, enableReviewStatus, enableNodeRemarks, enableNodeScoring, reviewStatusNodeTypes, nodeRemarksNodeTypes, nodeScoringNodeTypes, enableBulkReviewContextMenu, enableSingleReviewContextMenu, connectorStyle, toast, onCloseToast, enableRangeSelection, onPasteNodes, enableNodeCopy = true, interactionMode, onSetInteractionMode, enableInteractionModeSwitch, onRemarkClick, enableOutline
 }) => {
     const [canvasState, dispatch] = useReducer(canvasReducer, {
         rootUuid: mindMapData.rootUuid,
@@ -206,7 +206,7 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
     const [pastedNodeUuids, setPastedNodeUuids] = useState<string[] | null>(null);
 
     const [isShortcutsPanelVisible, setIsShortcutsPanelVisible] = useState(false);
-    const [shortcutsPanelPosition, setShortcutsPanelPosition] = useState<{top: number; right: number}>({ top: 0, right: 0 });
+    const [isOutlineDrawerVisible, setIsOutlineDrawerVisible] = useState(false);
     const [activePopup, setActivePopup] = useState<PopupState>({ type: null, nodeUuid: null, x: 0, y: 0 });
 
 
@@ -768,15 +768,6 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
     }, [dispatch]);
     
     const handleToggleShortcutsPanel = useCallback(() => {
-        if (shortcutsButtonRef.current && canvasRef.current) {
-            const buttonRect = shortcutsButtonRef.current.getBoundingClientRect();
-            const canvasRect = canvasRef.current.getBoundingClientRect();
-    
-            setShortcutsPanelPosition({
-                top: buttonRect.bottom - canvasRect.top + 8,
-                right: canvasRect.right - buttonRect.right,
-            });
-        }
         setIsShortcutsPanelVisible(prev => !prev);
     }, []);
 
@@ -1281,6 +1272,21 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
 
     const pathGenerator = connectorStyle === 'curve' ? generateCurvePath : generateElbowPath;
 
+    const handleOutlineNodeClick = useCallback((nodeUuid: string) => {
+        if (!canvasRef.current) return;
+        
+        // 1. Select the node
+        dispatch({ type: 'SELECT_NODE', payload: { nodeUuid } });
+        
+        // 2. Center the view on the node
+        const newTransform = viewCommands.centerView(
+            mindMapData.nodes,
+            nodeUuid,
+            canvasRef.current.getBoundingClientRect(),
+            canvasStateRef.current.transform.scale
+        );
+        dispatch({ type: 'SET_TRANSFORM', payload: newTransform });
+    }, [mindMapData.nodes]);
 
     return (
         <div 
@@ -1295,6 +1301,15 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
             }}
         >
             <div className="top-right-controls">
+                {enableOutline && (
+                    <button 
+                        className="shortcuts-toggle-button" 
+                        onClick={() => setIsOutlineDrawerVisible(true)} 
+                        title="大纲"
+                    >
+                        <FiList /> 大纲
+                    </button>
+                )}
                 {showShortcutsButton && (
                     <button ref={shortcutsButtonRef} className="shortcuts-toggle-button" onClick={handleToggleShortcutsPanel} title="快捷键">
                         <FiCommand /> 快捷键
@@ -1596,7 +1611,14 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
                 />
             )}
             
-            {isShortcutsPanelVisible && <ShortcutsPanel position={shortcutsPanelPosition} onClose={handleCloseShortcutsPanel} />}
+            <ShortcutsPanel visible={isShortcutsPanelVisible} onClose={handleCloseShortcutsPanel} />
+
+            <OutlineDrawer 
+                visible={isOutlineDrawerVisible}
+                mindMapData={mindMapData}
+                onClose={() => setIsOutlineDrawerVisible(false)}
+                onNodeClick={handleOutlineNodeClick}
+            />
 
             {activePopup.type === 'review' && activePopupNode && (
                 <ReviewMenu

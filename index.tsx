@@ -322,6 +322,9 @@ function ComprehensiveExample() {
                     // 传递自定义备注点击回调 (Optimized to receive Node directly)
                     onRemarkClick={handleRemarkClick}
 
+                    // 启用大纲功能
+                    enableOutline={true}
+
                     // 当自动保存开启时，可以隐藏保存按钮，或者保留它作为“立即保存”
                     topToolbarCommands={['undo', 'redo', 'separator', 'addSibling', 'addChild', 'delete', 'save', 'closeTop']}
                  />

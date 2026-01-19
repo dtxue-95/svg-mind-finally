@@ -39,19 +39,17 @@ interface MindMapNodeProps {
 }
 
 const STATUS_COLOR_PROPS: Record<string, { color: string; backgroundColor: string; }> = {
-    // 综合通过状态、功能用例执行状态
-    pending_execution: { color: '#007aff', backgroundColor: '#e6f0ff' }, // blue 待执行
-    passed: { color: '#34c759', backgroundColor: '#eafaf1' }, // green 通过
-    not_passed: { color: '#ff3b30', backgroundColor: '#fff0ef' }, // red 未通过
-    blocked: { color: '#ff9500', backgroundColor: '#fff7e6' }, // orange 阻塞
-    // 接口用例、UI用例执行状态
-    not_run: { color: '#8e8e93', backgroundColor: '#f4f4f7' }, // 未运行
-    running: { color: '#007aff', backgroundColor: '#e6f0ff' }, // 执行中
-    run_successful: { color: '#34c759', backgroundColor: '#eafaf1' }, // 运行成功
-    run_exception: { color: '#ff9500', backgroundColor: '#fff7e6' }, // 执行异常
-    run_interrupt: { color: '#ff3b30', backgroundColor: '#fff0ef' }, // 执行中断
-    run_failed: { color: '#ff3b30', backgroundColor: '#fff0ef' }, // 执行失败
-    default: { color: '#8e8e93', backgroundColor: '#f4f4f7' }, // default gray
+    pending_execution: { color: '#007aff', backgroundColor: '#e6f0ff' },
+    passed: { color: '#34c759', backgroundColor: '#eafaf1' },
+    not_passed: { color: '#ff3b30', backgroundColor: '#fff0ef' },
+    blocked: { color: '#ff9500', backgroundColor: '#fff7e6' },
+    not_run: { color: '#8e8e93', backgroundColor: '#f4f4f7' },
+    running: { color: '#007aff', backgroundColor: '#e6f0ff' },
+    run_successful: { color: '#34c759', backgroundColor: '#eafaf1' },
+    run_exception: { color: '#ff9500', backgroundColor: '#fff7e6' },
+    run_interrupt: { color: '#ff3b30', backgroundColor: '#fff0ef' },
+    run_failed: { color: '#ff3b30', backgroundColor: '#fff0ef' },
+    default: { color: '#8e8e93', backgroundColor: '#f4f4f7' },
 };
 
 const GENERATE_MODE_CONFIG: Record<string, { color: string; textColor: string; }> = {
@@ -76,126 +74,85 @@ const MindMapNodeComponent: React.FC<MindMapNodeProps> = ({
     useEffect(() => {
         setName(node.name ?? '');
     }, [node.name]);
-    
-    // Unified layout effect for sizing logic
+
+    /**
+     * Optimized Measurement Logic:
+     * To prevent height "explosion" during paste, we MUST determine the ideal width first.
+     */
+    const performMeasurement = useCallback((textToMeasure: string) => {
+        if (!contentRef.current) return { width: node.width ?? MIN_NODE_WIDTH, height: node.height ?? MIN_NODE_HEIGHT };
+
+        const content = contentRef.current;
+        const effectiveText = textToMeasure.trim() || PLACEHOLDER_TEXT;
+        
+        // Create a measurement container
+        const clone = content.cloneNode(true) as HTMLElement;
+        clone.style.position = 'absolute';
+        clone.style.visibility = 'hidden';
+        clone.style.left = '-9999px';
+        clone.style.top = '-9999px';
+        clone.style.height = 'auto';
+        clone.style.width = 'max-content';
+        clone.style.maxWidth = 'none';
+
+        // Prepare the text element inside the clone
+        let textElement: HTMLElement;
+        const textareaInClone = clone.querySelector('textarea');
+        if (textareaInClone) {
+            const span = document.createElement('span');
+            span.className = 'mind-map-node__text';
+            span.textContent = effectiveText;
+            textareaInClone.replaceWith(span);
+            textElement = span;
+        } else {
+            textElement = clone.querySelector('.mind-map-node__text') as HTMLElement;
+            if (textElement) textElement.textContent = effectiveText;
+        }
+
+        if (!textElement) return { width: node.width ?? MIN_NODE_WIDTH, height: node.height ?? MIN_NODE_HEIGHT };
+
+        // Step 1: Measure width with no wrapping (pre-style)
+        textElement.style.whiteSpace = 'pre';
+        document.body.appendChild(clone);
+        
+        const naturalWidth = Math.ceil(clone.getBoundingClientRect().width) + 8; // Small buffer for tags
+        const finalWidth = Math.min(Math.max(naturalWidth, MIN_NODE_WIDTH), MAX_NODE_WIDTH);
+        
+        // Step 2: Measure height at the determined width with wrapping
+        clone.style.width = `${finalWidth}px`;
+        textElement.style.whiteSpace = 'pre-wrap';
+        textElement.style.wordBreak = 'break-word';
+
+        const finalHeight = Math.max(MIN_NODE_HEIGHT, clone.scrollHeight);
+        document.body.removeChild(clone);
+
+        return { width: finalWidth, height: finalHeight };
+    }, [node.uuid]);
+
+    // Single source of truth for node sizing
     useLayoutEffect(() => {
         if (!node.uuid || !contentRef.current) return;
 
-        const measureNodeSize = (textToMeasure: string, isLiveEdit: boolean) => {
-            const content = contentRef.current!;
-            const clone = content.cloneNode(true) as HTMLElement;
-            
-            // 使用测量文本，如果是空字符串则使用占位符进行测量以保证节点最小宽度
-            const effectiveText = textToMeasure.trim() || PLACEHOLDER_TEXT;
-
-            // If cloning from an editing state, the DOM has a textarea.
-            // We must replace it with a measurable span to get the correct dimensions.
-            if (isLiveEdit) {
-                const textareaInClone = clone.querySelector('textarea');
-                if (textareaInClone) {
-                    const textDisplay = document.createElement('div');
-                    textDisplay.className = 'mind-map-node__text-wrapper';
-                    textDisplay.innerHTML = `<span class="mind-map-node__text"></span>`;
-                    (textDisplay.firstChild as HTMLElement).textContent = effectiveText;
-                    textareaInClone.replaceWith(textDisplay);
-                }
-            } else {
-                // When not editing, just update the text of the existing span
-                const textElement = clone.querySelector('.mind-map-node__text');
-                if (textElement) {
-                    textElement.textContent = effectiveText;
-                }
-            }
-
-            // Enforce that NO children can shrink. This is crucial for preventing tags or text from being compressed.
-            Array.from(clone.children).forEach((child) => {
-                (child as HTMLElement).style.flexShrink = '0';
-            });
-
-            const textWrapperInClone = clone.querySelector('.mind-map-node__text-wrapper') as HTMLElement;
-            if (textWrapperInClone) {
-                // FORCE: disable flex shrinking and width constraints during measurement
-                textWrapperInClone.style.width = 'auto';
-                textWrapperInClone.style.minWidth = 'auto'; 
-                textWrapperInClone.style.flex = 'none';
-            }
-
-            const textElementInClone = clone.querySelector('.mind-map-node__text');
-            if (!textElementInClone) return { width: node.width ?? MIN_NODE_WIDTH, height: node.height ?? MIN_NODE_HEIGHT };
-    
-            clone.style.position = 'absolute';
-            clone.style.visibility = 'hidden';
-            clone.style.left = '-9999px';
-            clone.style.top = '-9999px';
-            clone.style.height = 'auto';
-            clone.style.width = 'max-content'; 
-            clone.style.maxWidth = 'none'; 
-            clone.style.boxSizing = 'border-box';
-            (textElementInClone as HTMLElement).style.whiteSpace = 'nowrap';
-            
-            document.body.appendChild(clone);
-            
-            const naturalWidth = Math.ceil(clone.getBoundingClientRect().width) + 12; 
-            const finalWidth = Math.min(Math.max(naturalWidth, MIN_NODE_WIDTH), MAX_NODE_WIDTH);
-            
-            clone.style.width = `${finalWidth}px`;
-            (textElementInClone as HTMLElement).style.whiteSpace = 'normal';
-            if (textWrapperInClone) {
-                textWrapperInClone.style.width = '';
-                textWrapperInClone.style.minWidth = '';
-                textWrapperInClone.style.flex = ''; 
-            }
-
-            const finalHeight = Math.max(MIN_NODE_HEIGHT, clone.scrollHeight);
-            
-            document.body.removeChild(clone);
-            return { width: finalWidth, height: finalHeight };
-        };
+        const { width: newWidth, height: newHeight } = performMeasurement(isEditing ? name : (node.name ?? ''));
         
-        // On initial mount, measure but don't trigger a full layout.
-        if (isInitialMount.current) {
-            const { width: newWidth, height: newHeight } = measureNodeSize(node.name ?? '', false);
-            if (newWidth !== node.width || newHeight !== node.height) {
-                onUpdateSize(node.uuid, { width: newWidth, height: newHeight }, { layout: false });
-            }
-            isInitialMount.current = false;
-        } else if (isEditing) {
-            // During live editing, resize dynamically without a full layout.
-            const { width: newWidth, height: newHeight } = measureNodeSize(name, true);
-            if (newWidth !== node.width || newHeight !== node.height) {
-                onUpdateSize(node.uuid, { width: newWidth, height: newHeight }, { layout: false });
-            }
-        } else {
-            const { width: newWidth, height: newHeight } = measureNodeSize(node.name ?? '', false);
-            if (newWidth !== node.width || newHeight !== node.height) {
-                onUpdateSize(node.uuid, { width: newWidth, height: newHeight }, { layout: true });
-            }
-        }
-    }, [
-        node.uuid, 
-        node.name, 
-        node.width, 
-        node.height, 
-        node.nodeType, 
-        node.priorityLevel, 
-        JSON.stringify(node.caseTags), 
-        isEditing, 
-        name, 
-        onUpdateSize,
-        node.id, 
-        node.reviewStatusCode, 
-        node.hasRemark, 
-        node.hasScore, 
-        showReviewStatus, 
-        showRemarkIcon, 
-        showScoreInfo,
-        showAITag,
-        showNodeType,
-        showPriority,
-        node.generateModeCode,
-        node.generateModeName
-    ]);
+        const widthDiff = Math.abs(newWidth - (node.width || 0));
+        const heightDiff = Math.abs(newHeight - (node.height || 0));
 
+        if (widthDiff > 0.5 || heightDiff > 0.5) {
+            // During active editing, update size SILENTLY (layout: false) to keep foreignObject in sync
+            // without recalculating the whole tree until the user finishes typing.
+            const shouldLayoutTree = !isInitialMount.current && !isEditing;
+            onUpdateSize(node.uuid, { width: newWidth, height: newHeight }, { layout: shouldLayoutTree });
+        }
+        
+        isInitialMount.current = false;
+    }, [
+        node.uuid, node.name, node.width, node.height, node.nodeType, node.priorityLevel,
+        JSON.stringify(node.caseTags), isEditing, name, onUpdateSize, node.id,
+        node.reviewStatusCode, node.hasRemark, node.hasScore, showReviewStatus,
+        showRemarkIcon, showScoreInfo, showAITag, showNodeType, showPriority,
+        node.generateModeCode, node.generateModeName, performMeasurement
+    ]);
 
     useEffect(() => {
         if (isEditing && textareaRef.current) {
@@ -207,23 +164,14 @@ const MindMapNodeComponent: React.FC<MindMapNodeProps> = ({
         }
     }, [isEditing]);
     
-    // Effect for auto-editing newly added nodes
     useEffect(() => {
         if (isNewlyAdded && !isReadOnly && typeof node.width === 'number' && typeof node.height === 'number') {
-            isInitialEditRef.current = true; // Mark as initial edit
+            isInitialEditRef.current = true;
             editingStartState.current = { name: node.name ?? '', width: node.width, height: node.height };
             setIsEditing(true);
             onNodeFocused(); 
         }
     }, [isNewlyAdded, isReadOnly, onNodeFocused, node.name, node.width, node.height]);
-
-    const autoResizeTextarea = () => {
-        if (textareaRef.current) {
-            textareaRef.current.style.height = 'auto';
-            textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
-        }
-    };
-    useEffect(autoResizeTextarea, [isEditing, name]);
 
     const handleDoubleClick = () => {
         if (isReadOnly || !node.uuid) return;
@@ -234,27 +182,27 @@ const MindMapNodeComponent: React.FC<MindMapNodeProps> = ({
 
     const handleTextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
         setName(e.target.value);
+        // We let the useLayoutEffect above handle the height adjustment to ensure 
+        // node.height and foreignObject height are updated in the same frame.
     };
 
     const handleBlur = useCallback(() => {
         if(isEditing && node.uuid) {
             setIsEditing(false);
             const newName = name.trim();
-            // The `node` prop contains the latest dimensions from the live-editing updates.
             const finalSize = { width: node.width!, height: node.height! };
-            
             const startState = editingStartState.current;
             if (!startState) return; 
 
             const textChanged = startState.name !== newName;
-            const sizeChanged = startState.width !== finalSize.width || startState.height !== finalSize.height;
+            const sizeChanged = Math.abs(startState.width - finalSize.width) > 1 || Math.abs(startState.height - finalSize.height) > 1;
 
             if (textChanged || sizeChanged) {
                  onFinishEditing(node.uuid, newName, finalSize, { width: startState.width, height: startState.height }, isInitialEditRef.current);
             }
             isInitialEditRef.current = false; 
         }
-    }, [isEditing, node, name, onFinishEditing]);
+    }, [isEditing, node.uuid, node.width, node.height, name, onFinishEditing]);
 
 
     const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -264,7 +212,7 @@ const MindMapNodeComponent: React.FC<MindMapNodeProps> = ({
         }
         if (e.key === 'Escape') {
             e.preventDefault();
-            setName(node.name ?? ''); // Revert changes
+            setName(node.name ?? ''); 
             setIsEditing(false);
             isInitialEditRef.current = false; 
         }
@@ -277,18 +225,12 @@ const MindMapNodeComponent: React.FC<MindMapNodeProps> = ({
         if (isEditing || !node.uuid) return;
         
         onSelect(node.uuid); 
-        
-        if (e.button !== 0) {
-            return;
-        }
-
+        if (e.button !== 0) return;
         if (isReadOnly) {
             onReadOnlyPanStart(e);
             return;
         }
-
         if (!isDraggable) return; 
-        
         onDragStart(node.uuid, e);
     };
 
@@ -308,9 +250,7 @@ const MindMapNodeComponent: React.FC<MindMapNodeProps> = ({
     };
 
     const getHighlightedText = (text: string, query: string): React.ReactNode => {
-        if (!query || !text) {
-            return text;
-        }
+        if (!query || !text) return text;
         const parts = text.split(new RegExp(`(${query})`, 'gi'));
         return (
             <>
@@ -327,12 +267,10 @@ const MindMapNodeComponent: React.FC<MindMapNodeProps> = ({
         );
     };
 
-
     const typeProps = NODE_TYPE_PROPS[node.nodeType ?? 'GENERAL'];
     const priorityProps = node.priorityLevel ? PRIORITY_PROPS[node.priorityLevel] : null;
     const hasChildren = node.childNodeList && node.childNodeList.length > 0;
     const canBeCollapsed = hasChildren && node.parentUuid;
-
 
     const nodeClasses = [
         'mind-map-node',
@@ -502,7 +440,6 @@ const MindMapNodeComponent: React.FC<MindMapNodeProps> = ({
                                  default:
                                      statusCode = null;
                              }
-                             
                              const props = STATUS_COLOR_PROPS[statusCode || 'default'] || STATUS_COLOR_PROPS.default;
 
                             return (
@@ -531,6 +468,7 @@ const MindMapNodeComponent: React.FC<MindMapNodeProps> = ({
                         className="mind-map-node__textarea"
                         placeholder={PLACEHOLDER_TEXT}
                         rows={1}
+                        style={{ height: '100%', minHeight: '22px' }}
                     />
                 ) : (
                     <div className="mind-map-node__text-wrapper">

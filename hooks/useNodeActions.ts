@@ -43,7 +43,7 @@ export const useNodeActions = (
         if (!strictMode) {
              newNode = {
                 uuid: newUuid,
-                name: '新分支主题',
+                name: '', // 优化：初始名称为空，配合 placeholder 使用
                 parentUuid,
                 childNodeList: [],
                 position: { x: 0, y: 0 },
@@ -120,7 +120,7 @@ export const useNodeActions = (
 
             newNode = {
                 uuid: newUuid,
-                name: '新分支主题',
+                name: '', // 优化：初始名称为空
                 parentUuid,
                 childNodeList: [],
                 position: { x: 0, y: 0 },
@@ -162,7 +162,7 @@ export const useNodeActions = (
             const info = {
                 operationType: OperationType.ADD_NODE,
                 timestamp: Date.now(),
-                description: `Added node '${finalNewNode.name}' as a child of '${parentNode.name}'`,
+                description: `Added node '${finalNewNode.name || 'Untitled'}' as a child of '${parentNode.name}'`,
                 previousData: mindMap,
                 currentData: laidOutMap,
                 affectedNodeUuids: [newUuid],

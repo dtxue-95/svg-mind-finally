@@ -60,6 +60,8 @@ const GENERATE_MODE_CONFIG: Record<string, { color: string; textColor: string; }
     'modify_after_ai_generation': { color: '#007affab', textColor: 'white' },
 };
 
+const PLACEHOLDER_TEXT = '新分支主题';
+
 const MindMapNodeComponent: React.FC<MindMapNodeProps> = ({
     node, isSelected, isBeingDragged, onSelect, onFinishEditing, onDragStart, onUpdateSize, showAITag, isReadOnly, isDraggable, isSearchMatch, isCurrentSearchMatch, searchQuery, showNodeType = true, showPriority = true, onReadOnlyPanStart, onToggleCollapse, descendantCount, onContextMenu, isPossibleDropTarget, isValidDropTarget, isInvalidDropTarget, getNodeBackgroundColor, showReviewStatus, showRemarkIcon, showScoreInfo, onOpenReviewContextMenu, onOpenRemarkModal, onOpenScoreModal, isNewlyAdded, onNodeFocused
 }) => {
@@ -83,6 +85,9 @@ const MindMapNodeComponent: React.FC<MindMapNodeProps> = ({
             const content = contentRef.current!;
             const clone = content.cloneNode(true) as HTMLElement;
             
+            // 使用测量文本，如果是空字符串则使用占位符进行测量以保证节点最小宽度
+            const effectiveText = textToMeasure.trim() || PLACEHOLDER_TEXT;
+
             // If cloning from an editing state, the DOM has a textarea.
             // We must replace it with a measurable span to get the correct dimensions.
             if (isLiveEdit) {
@@ -91,14 +96,14 @@ const MindMapNodeComponent: React.FC<MindMapNodeProps> = ({
                     const textDisplay = document.createElement('div');
                     textDisplay.className = 'mind-map-node__text-wrapper';
                     textDisplay.innerHTML = `<span class="mind-map-node__text"></span>`;
-                    (textDisplay.firstChild as HTMLElement).textContent = textToMeasure;
+                    (textDisplay.firstChild as HTMLElement).textContent = effectiveText;
                     textareaInClone.replaceWith(textDisplay);
                 }
             } else {
                 // When not editing, just update the text of the existing span
                 const textElement = clone.querySelector('.mind-map-node__text');
                 if (textElement) {
-                    textElement.textContent = textToMeasure;
+                    textElement.textContent = effectiveText;
                 }
             }
 
@@ -110,9 +115,8 @@ const MindMapNodeComponent: React.FC<MindMapNodeProps> = ({
             const textWrapperInClone = clone.querySelector('.mind-map-node__text-wrapper') as HTMLElement;
             if (textWrapperInClone) {
                 // FORCE: disable flex shrinking and width constraints during measurement
-                // This ensures the wrapper expands to the full width of the text/content
                 textWrapperInClone.style.width = 'auto';
-                textWrapperInClone.style.minWidth = 'auto'; // Important override for flex items
+                textWrapperInClone.style.minWidth = 'auto'; 
                 textWrapperInClone.style.flex = 'none';
             }
 
@@ -124,23 +128,18 @@ const MindMapNodeComponent: React.FC<MindMapNodeProps> = ({
             clone.style.left = '-9999px';
             clone.style.top = '-9999px';
             clone.style.height = 'auto';
-            // Use max-content to forcefully expand the container to the sum of its children's natural widths
             clone.style.width = 'max-content'; 
-            clone.style.maxWidth = 'none'; // Ensure no max-width constrains it
+            clone.style.maxWidth = 'none'; 
             clone.style.boxSizing = 'border-box';
             (textElementInClone as HTMLElement).style.whiteSpace = 'nowrap';
             
             document.body.appendChild(clone);
             
-            // Measure natural width and apply constraints
-            // Increased buffer to +12px to ensure text never wraps unexpectedly across different browsers
             const naturalWidth = Math.ceil(clone.getBoundingClientRect().width) + 12; 
             const finalWidth = Math.min(Math.max(naturalWidth, MIN_NODE_WIDTH), MAX_NODE_WIDTH);
             
-            // Apply final width and measure height with wrapping
             clone.style.width = `${finalWidth}px`;
             (textElementInClone as HTMLElement).style.whiteSpace = 'normal';
-            // Restore wrapper styles to allow wrapping calculation
             if (textWrapperInClone) {
                 textWrapperInClone.style.width = '';
                 textWrapperInClone.style.minWidth = '';
@@ -167,8 +166,6 @@ const MindMapNodeComponent: React.FC<MindMapNodeProps> = ({
                 onUpdateSize(node.uuid, { width: newWidth, height: newHeight }, { layout: false });
             }
         } else {
-            // This branch handles changes to content (name, tags) when not in edit mode.
-            // This will trigger a full re-layout, which is correct for these kinds of changes.
             const { width: newWidth, height: newHeight } = measureNodeSize(node.name ?? '', false);
             if (newWidth !== node.width || newHeight !== node.height) {
                 onUpdateSize(node.uuid, { width: newWidth, height: newHeight }, { layout: true });
@@ -212,17 +209,14 @@ const MindMapNodeComponent: React.FC<MindMapNodeProps> = ({
     
     // Effect for auto-editing newly added nodes
     useEffect(() => {
-        // Wait until dimensions are valid (numbers) before starting the edit.
-        // This ensures the canvas has had time to layout and center the node.
         if (isNewlyAdded && !isReadOnly && typeof node.width === 'number' && typeof node.height === 'number') {
             isInitialEditRef.current = true; // Mark as initial edit
             editingStartState.current = { name: node.name ?? '', width: node.width, height: node.height };
             setIsEditing(true);
-            onNodeFocused(); // Notify parent that the node has been "focused"
+            onNodeFocused(); 
         }
     }, [isNewlyAdded, isReadOnly, onNodeFocused, node.name, node.width, node.height]);
 
-    // This effect resizes the textarea element itself to show all content.
     const autoResizeTextarea = () => {
         if (textareaRef.current) {
             textareaRef.current.style.height = 'auto';
@@ -245,13 +239,12 @@ const MindMapNodeComponent: React.FC<MindMapNodeProps> = ({
     const handleBlur = useCallback(() => {
         if(isEditing && node.uuid) {
             setIsEditing(false);
-            const newName = name.trim() || 'Central Idea';
+            const newName = name.trim();
             // The `node` prop contains the latest dimensions from the live-editing updates.
-            // Using these values "bakes in" the size from the editing session.
             const finalSize = { width: node.width!, height: node.height! };
             
             const startState = editingStartState.current;
-            if (!startState) return; // Should not happen
+            if (!startState) return; 
 
             const textChanged = startState.name !== newName;
             const sizeChanged = startState.width !== finalSize.width || startState.height !== finalSize.height;
@@ -259,7 +252,7 @@ const MindMapNodeComponent: React.FC<MindMapNodeProps> = ({
             if (textChanged || sizeChanged) {
                  onFinishEditing(node.uuid, newName, finalSize, { width: startState.width, height: startState.height }, isInitialEditRef.current);
             }
-            isInitialEditRef.current = false; // Reset initial edit flag
+            isInitialEditRef.current = false; 
         }
     }, [isEditing, node, name, onFinishEditing]);
 
@@ -273,7 +266,7 @@ const MindMapNodeComponent: React.FC<MindMapNodeProps> = ({
             e.preventDefault();
             setName(node.name ?? ''); // Revert changes
             setIsEditing(false);
-            isInitialEditRef.current = false; // Cancelled edit, so no special handling needed next time
+            isInitialEditRef.current = false; 
         }
     };
     
@@ -283,10 +276,8 @@ const MindMapNodeComponent: React.FC<MindMapNodeProps> = ({
         }
         if (isEditing || !node.uuid) return;
         
-        onSelect(node.uuid); // Always allow selection
+        onSelect(node.uuid); 
         
-        // Only start pan/drag logic for LEFT clicks (e.button === 0).
-        // Right-clicks (e.button === 2) should proceed to the onContextMenu handler.
         if (e.button !== 0) {
             return;
         }
@@ -296,7 +287,7 @@ const MindMapNodeComponent: React.FC<MindMapNodeProps> = ({
             return;
         }
 
-        if (!isDraggable) return; // But don't start dragging in non-draggable mode
+        if (!isDraggable) return; 
         
         onDragStart(node.uuid, e);
     };
@@ -310,7 +301,7 @@ const MindMapNodeComponent: React.FC<MindMapNodeProps> = ({
     };
 
     const handleToggleCollapse = (e: React.MouseEvent) => {
-        e.stopPropagation(); // Prevent node selection, dragging, etc.
+        e.stopPropagation(); 
         if (node.uuid) {
             onToggleCollapse(node.uuid);
         }
@@ -340,7 +331,6 @@ const MindMapNodeComponent: React.FC<MindMapNodeProps> = ({
     const typeProps = NODE_TYPE_PROPS[node.nodeType ?? 'GENERAL'];
     const priorityProps = node.priorityLevel ? PRIORITY_PROPS[node.priorityLevel] : null;
     const hasChildren = node.childNodeList && node.childNodeList.length > 0;
-    // The root node cannot be collapsed
     const canBeCollapsed = hasChildren && node.parentUuid;
 
 
@@ -362,14 +352,12 @@ const MindMapNodeComponent: React.FC<MindMapNodeProps> = ({
     }
     const case_props = STATUS_COLOR_PROPS[node.finalTestCaseStatusCode || 'default'] || STATUS_COLOR_PROPS.default;
 
-    // --- Review Info Rendering ---
-    // Only render the container if there is an ID AND at least one icon type is enabled.
     const shouldRenderReviewIcons = !!node.id && (showReviewStatus || showRemarkIcon || showScoreInfo);
 
     const handleReviewIconClick = (e: React.MouseEvent) => {
         e.stopPropagation();
         if (node.uuid) {
-            onSelect(node.uuid); // Also select the node
+            onSelect(node.uuid); 
             onOpenReviewContextMenu(node.uuid, e);
         }
     };
@@ -377,7 +365,7 @@ const MindMapNodeComponent: React.FC<MindMapNodeProps> = ({
     const handleRemarkIconClick = (e: React.MouseEvent) => {
         e.stopPropagation();
         if (node.uuid) {
-            onSelect(node.uuid); // Also select the node
+            onSelect(node.uuid); 
             onOpenRemarkModal(node.uuid, e);
         }
     };
@@ -385,7 +373,7 @@ const MindMapNodeComponent: React.FC<MindMapNodeProps> = ({
     const handleScoreIconClick = (e: React.MouseEvent) => {
         e.stopPropagation();
         if (node.uuid) {
-            onSelect(node.uuid); // Also select the node
+            onSelect(node.uuid); 
             onOpenScoreModal(node.uuid, e);
         }
     };
@@ -432,7 +420,6 @@ const MindMapNodeComponent: React.FC<MindMapNodeProps> = ({
         );
     };
 
-    // --- Dynamic Generation Mode Ribbon ---
     const generateModeConfig = node.generateModeCode ? GENERATE_MODE_CONFIG[node.generateModeCode] : null;
 
     return (
@@ -542,12 +529,15 @@ const MindMapNodeComponent: React.FC<MindMapNodeProps> = ({
                         onBlur={handleBlur}
                         onKeyDown={handleKeyDown}
                         className="mind-map-node__textarea"
+                        placeholder={PLACEHOLDER_TEXT}
                         rows={1}
                     />
                 ) : (
                     <div className="mind-map-node__text-wrapper">
-                        <span className="mind-map-node__text">
-                             {isSearchMatch ? getHighlightedText(node.name ?? '', searchQuery) : (node.name ?? '')}
+                        <span className={`mind-map-node__text ${!node.name ? 'mind-map-node__text--placeholder' : ''}`}>
+                             {!node.name 
+                                ? PLACEHOLDER_TEXT 
+                                : (isSearchMatch ? getHighlightedText(node.name, searchQuery) : node.name)}
                         </span>
                     </div>
                 )}

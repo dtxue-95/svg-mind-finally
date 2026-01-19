@@ -349,6 +349,12 @@ foreignObject {
   user-select: text; /* Allow selecting text in non-edit mode */
 }
 
+/* Placeholder Style */
+.mind-map-node__text--placeholder {
+  color: #aaa;
+  font-style: italic;
+}
+
 .mind-map-node__textarea {
   width: 100%;
   height: auto;
@@ -367,6 +373,12 @@ foreignObject {
   flex-grow: 1;
   min-height: 22px;
   user-select: text; /* Allow text selection when editing */
+}
+
+/* Browser default placeholder color adjustment */
+.mind-map-node__textarea::placeholder {
+  color: #bbb;
+  opacity: 1;
 }
 
 /* === Review Info Styles === */
